@@ -31,12 +31,28 @@ const BREW: Record<string, string[]> = { node: ["node"], git: ["git"], claude: [
 const WINGET: Record<string, string> = { node: "OpenJS.NodeJS.LTS", git: "Git.Git", claude: "Anthropic.ClaudeCode" };
 const QUIET = ["--silent", "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"];
 
+// The Mac route without Homebrew (the owner's yes, 2026-10-12): Node's official package for this Mac's chip, its checksum
+// checked, unpacked into ~/.local/node with its commands linked in ~/.local/bin; Claude Code from Anthropic's own
+// installer, which installs under $HOME and refuses sudo. The setup finds both through ~/.local/bin (real.ts).
+// NODE_LINE is the current long-term Node line; move it when Node names a new one.
+const NODE_LINE = "latest-v24.x";
+const MAC_NO_BREW: Record<string, string> = {
+  node: [
+    "set -e", 'a=$(uname -m); [ "$a" = x86_64 ] && a=x64', `base=https://nodejs.org/dist/${NODE_LINE}`, "t=$(mktemp -d)",
+    'curl -fsSL "$base/SHASUMS256.txt" -o "$t/sums"', 'f=$(awk \'{print $2}\' "$t/sums" | grep "darwin-$a.tar.gz$")',
+    'curl -fsSL "$base/$f" -o "$t/$f"', '(cd "$t" && grep " $f$" sums | shasum -a 256 -c -)',
+    'mkdir -p "$HOME/.local/node" "$HOME/.local/bin"', 'tar -xzf "$t/$f" -C "$HOME/.local/node" --strip-components 1',
+    'for b in node npm npx; do ln -sf "$HOME/.local/node/bin/$b" "$HOME/.local/bin/$b"; done', 'rm -rf "$t"',
+  ].join("\n"),
+  claude: "curl -fsSL https://claude.ai/install.sh | bash",
+};
+
 export interface Installed extends Tool { action: "kept" | "installed" | "updated" | "not done"; message?: string }
 
 const lastLine = (out: string) => out.trim().split(/\r?\n/).filter(Boolean).pop()?.slice(0, 200) ?? "";
 
-// Homebrew on a Mac belongs to the user who installed it; a second user of that Mac cannot write to it (the first-run test
-// is a new macOS user on the JHS MacBook).
+// Homebrew on a Mac belongs to the user who installed it; a second user of that Mac cannot write to it, so that user
+// takes the route without Homebrew.
 const canWrite = (dir: string) => { try { fs.accessSync(dir, fs.constants.W_OK); return true; } catch { return false; } };
 
 export function installTools(run: Run, platform: NodeJS.Platform, writable: (dir: string) => boolean = canWrite): Installed[] {
@@ -50,11 +66,17 @@ export function installTools(run: Run, platform: NodeJS.Platform, writable: (dir
     if (t.name === "paseo") return { ...before, action: "not done", message: "Update Paseo from its own menu, or from paseo.sh." };
     const pkg = BREW[t.name];
     let why = "", wholeComputer = false;
-    if (platform === "darwin") {
-      if (!brew) return { ...before, action: "not done", message: "Homebrew comes first: it installs the other tools. Get it from brew.sh (it asks for your Mac password once), then press Install again." };
-      if (brewTheirs) return { ...before, action: "not done", message: `Homebrew on this Mac belongs to another user, so it cannot install for you. Ask the person who set up this Mac to install ${t.name} for everyone, or set up the Agentic Pockets on their account.` };
+    if (platform === "darwin" && brew && !brewTheirs) {
       const managed = before.state === "old" && run("brew", ["list", "--versions", ...pkg]).status === 0;
       run("brew", [managed ? "upgrade" : "install", ...pkg]);
+    } else if (platform === "darwin") {
+      // No Homebrew of this user's: each tool's own official route, for this user only, with no password.
+      if (t.name === "git") {
+        run("xcode-select", ["--install"]);
+        return { ...before, action: "not done", message: "Apple's developer tools window is open: they carry git. Click Install there and wait for it to finish (on a standard account Apple may ask for an admin's password), then press Install again." };
+      }
+      const r = run("sh", ["-c", MAC_NO_BREW[t.name]]);
+      if (r.status !== 0) why = lastLine(r.stdout);
     } else if (platform === "win32") {
       if (!winget) return { ...before, action: "not done", message: "winget comes first: it installs the other tools. Get App Installer from the Microsoft Store, then press Install again." };
       const id = ["--id", WINGET[t.name], "--exact"];

@@ -72,6 +72,10 @@ const machine = (o: { have: Record<string, string>; brew?: boolean; winget?: boo
       have[TOOL[pkg]] = LATEST[pkg]; managed.add(pkg); return ok();
     }
     if (args[0] === "upgrade") { if (!managed.has(pkg)) return no; have[TOOL[pkg]] = LATEST[pkg]; return ok(); }
+    // The Mac route without Homebrew: the official downloads, for this user; Apple's tools window answers at once.
+    if (cmd === "sh" && /nodejs\.org\/dist/.test(args[1] ?? "")) { have.node = "24.21.0"; return ok(); }
+    if (cmd === "sh" && /claude\.ai\/install\.sh/.test(args[1] ?? "")) { have.claude = "2.1.290"; return ok(); }
+    if (cmd === "xcode-select" && args[0] === "--install") return ok();
     return no;
   };
   return { run, calls, have };
@@ -99,11 +103,30 @@ test("Mac: an old tool Homebrew manages is upgraded; an old one from elsewhere g
   assert.deepEqual(r.slice(0, 2).map((t) => [t.name, t.action, t.state, t.have]), [["node", "updated", "ok", "26.11.1"], ["git", "updated", "ok", "2.55.0"]]);
 });
 
-test("Mac without Homebrew: nothing is run, and the tool says Homebrew comes first", () => {
+// The Mac route without Homebrew (the owner's yes to its three test points, 2026-10-12 14:40 CDT): used when Homebrew is
+// missing or belongs to another user; a user's own Homebrew still comes first.
+const noBrewRoute = (m: ReturnType<typeof machine>, r: ReturnType<typeof installTools>) => {
+  const node = m.calls.find((c) => c.startsWith("sh -c") && c.includes("nodejs.org/dist"));
+  assert.ok(node, "Node from its official package");
+  assert.match(node!, /darwin-/); assert.match(node!, /\$HOME\/\.local/); assert.doesNotMatch(node!, /sudo/);
+  assert.equal(r[0].action, "installed");
+  const claude = m.calls.find((c) => c.startsWith("sh -c") && c.includes("https://claude.ai/install.sh"));
+  assert.ok(claude, "Claude Code from Anthropic's installer"); assert.doesNotMatch(claude!, /sudo/);
+  assert.equal(r[2].action, "installed");
+  assert.ok(!m.calls.some((c) => c.startsWith("brew install") || c.startsWith("brew upgrade")), "no Homebrew");
+};
+
+test("Mac without Homebrew: Node and Claude Code from their official installers into the user's own folder, no password", () => {
   const m = machine({ have: { git: "2.39.5", paseo: "0.11.2" } });
+  noBrewRoute(m, installTools(m.run, "darwin", () => true));
+});
+
+test("Mac without git: Apple's developer tools window opens, and the screen says what to click", () => {
+  const m = machine({ have: { node: "24.16.0", claude: "2.1.270", paseo: "0.11.2" } });
   const r = installTools(m.run, "darwin", () => true);
-  assert.deepEqual(m.calls.filter((c) => / (install|upgrade) /.test(c)), []);
-  assert.equal(r[0].state, "missing"); assert.match(r[0].message ?? "", /Homebrew/);
+  assert.ok(m.calls.includes("xcode-select --install"));
+  assert.equal(r[1].action, "not done");
+  assert.match(r[1].message ?? "", /Apple's developer tools window/); assert.match(r[1].message ?? "", /press Install again/); assert.match(r[1].message ?? "", /admin/);
 });
 
 test("Windows: a missing tool is installed with winget for this user only, quietly, with the agreements accepted", () => {
@@ -222,9 +245,7 @@ test("Windows: a tool installed for the whole computer says so, so the user know
   assert.equal(r[0].action, "installed"); assert.match(r[0].message ?? "", /whole computer/);
 });
 
-test("Mac: Homebrew that belongs to another user on this Mac is named plainly, and nothing is tried", () => {
+test("Mac: Homebrew that belongs to another user is left alone, and the route without Homebrew installs for this user", () => {
   const m = machine({ have: { git: "2.39.5", paseo: "0.11.2" }, brew: true });
-  const r = installTools(m.run, "darwin", () => false);
-  assert.ok(!m.calls.some((c) => c.startsWith("brew install") || c.startsWith("brew upgrade")));
-  assert.equal(r[0].action, "not done"); assert.match(r[0].message ?? "", /another user/);
+  noBrewRoute(m, installTools(m.run, "darwin", () => false));
 });
