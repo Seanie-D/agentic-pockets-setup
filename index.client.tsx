@@ -26,7 +26,7 @@ function SetupItem({ currentScreen, openScreen }: PluginSidebarItemProps) {
 }
 
 export default function contribute(client: PluginClientContext) {
-  client.addScreen({ id: "setup", title: "Agentic Pockets setup", Component: SetupScreen });
-  client.addSidebarHeaderItem({ id: "setup", title: "Agentic Pockets setup", Component: SetupItem });
+  client.addScreen({ id: "setup", title: "Agentic Pockets Setup", Component: SetupScreen });
+  client.addSidebarHeaderItem({ id: "setup", title: "Agentic Pockets Setup", Component: SetupItem });
   return () => {};
 }

@@ -4,8 +4,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-export const LABEL_DURING = "Agentic Pockets setup";
-export const LABEL_AFTER = "Agentic Pockets Help";   // Ultron's pick for after 100 %, with the owner for a ruling
+export const LABEL_DURING = "Agentic Pockets Setup";   // the owner, Q1c 2026-10-12: Setup until complete, then Help
+export const LABEL_AFTER = "Agentic Pockets Help";
 
 export interface Item { id: string; title: string; body: string; done: { at: string; by: string } | null }
 export interface Tutorial { items: Item[]; percent: number; complete: boolean; label: string; reward: { citizen: string; image: string | null; line: string | null } | null }
