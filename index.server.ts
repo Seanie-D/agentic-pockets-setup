@@ -2,12 +2,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { PluginServerContext } from "@getpaseo/plugin/server";
-import { connect, install, packsIn } from "./server/setup";
+import { connect, install, packsIn, setMode } from "./server/setup";
 import { checkTools, installTools, listExtras } from "./server/tools";
 import { deps, discussDeps, exec, rewardDeps, startSignIn } from "./server/real";
 import { profileDir, signedIn } from "./server/profile";
-import { discuss } from "./server/discuss";
-import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc, profileStatusRpc, profileSignInRpc, welcomeDismissRpc, welcomeReadRpc } from "./shared/contracts";
+import { ask, discuss } from "./server/discuss";
+import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc, profileStatusRpc, profileSignInRpc, welcomeDismissRpc, welcomeReadRpc, modeSetRpc, askRpc } from "./shared/contracts";
 import { markWelcomeSeen, welcomeSeen } from "./server/welcome";
 import { markSeen, readTutorial, realProbe, stateTicks } from "./server/tutorial";
 import { rewardPass } from "./server/reward";
@@ -29,7 +29,8 @@ export default function contribute(server: PluginServerContext) {
     const accounts = await paseo.providers.listAvailable().then((r) => ((r as { providers?: { provider?: string; id?: string; available?: boolean }[] }).providers ?? [])
       .filter((p) => p.available !== false).map((p) => String(p.provider ?? p.id))).catch(() => ["claude"]);
     return { tools: checkTools(exec), extras: listExtras(os.homedir()), root: ROOT, connected: fs.existsSync(path.join(ROOT, ".upstream")),
-      packs: packsIn(ROOT), accounts: accounts.length ? accounts : ["claude"], setupDone: record().setupDone === true };
+      packs: packsIn(ROOT), accounts: accounts.length ? accounts : ["claude"], setupDone: record().setupDone === true,
+      mode: record().mode === "always-on" ? "always-on" as const : "on-demand" as const };
   });
   server.handle(welcomeReadRpc, async () => ({ seen: welcomeSeen(os.homedir()) }));
   server.handle(welcomeDismissRpc, async () => { markWelcomeSeen(os.homedir(), new Date().toISOString()); return { seen: true }; });
@@ -44,10 +45,12 @@ export default function contribute(server: PluginServerContext) {
   server.handle(connectRpc, async ({ code }, { paseo }) => connect({ code, root: ROOT, home: os.homedir() }, deps(paseo)));
   server.handle(profileStatusRpc, async () => ({ signedIn: signedIn(exec, os.homedir()) }));
   server.handle(profileSignInRpc, async () => startSignIn(profileDir(os.homedir())));
-  server.handle(installRpc, async ({ userName, citizens, accounts, extrasOff, cleanProfile }, { paseo }) => {
+  server.handle(modeSetRpc, async ({ mode }) => setMode(ROOT, mode));
+  server.handle(askRpc, async ({ topic }, { paseo }) => ask(ROOT, topic, discussDeps(paseo)));
+  server.handle(installRpc, async ({ userName, citizens, accounts, extrasOff, cleanProfile, mode }, { paseo }) => {
     // The clean profile needs its sign-in first: a signed-out folder would greet the user with "Not logged in".
     if (cleanProfile && !signedIn(exec, os.homedir())) return { ok: false, message: "Sign in to Claude for your house first, or switch the clean profile off.", steps: [] };
-    return install({ code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, cleanProfile, root: ROOT, home: os.homedir() }, deps(paseo));
+    return install({ code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, cleanProfile, mode, root: ROOT, home: os.homedir() }, deps(paseo));
   });
   server.handle(finishRpc, async () => {
     const rec = record(); fs.writeFileSync(path.join(ROOT, "house.json"), JSON.stringify({ ...rec, setupDone: true, updatedAt: new Date().toISOString() }, null, 2) + "\n");

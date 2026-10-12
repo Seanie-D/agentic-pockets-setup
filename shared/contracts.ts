@@ -13,14 +13,14 @@ export const status = defineRpc({
   name: "setup.status",
   input: z.object({}),
   output: z.object({ tools: z.array(Tool), extras: z.array(Extra), root: z.string(), connected: z.boolean(),
-    packs: z.array(z.object({ name: z.string(), hello: z.string() })), accounts: z.array(z.string()), setupDone: z.boolean() }),
+    packs: z.array(z.object({ name: z.string(), hello: z.string() })), accounts: z.array(z.string()), setupDone: z.boolean(), mode: z.enum(["on-demand", "always-on"]) }),
 });
 export const installToolsRpc = defineRpc({ name: "setup.tools.install", input: z.object({}), output: z.object({ tools: z.array(Installed) }) });
 export const connectRpc = defineRpc({ name: "setup.connect", input: z.object({ code: z.string().min(8) }), output: Result });
 export const installRpc = defineRpc({
   name: "setup.install",
   input: z.object({ userName: z.string().min(1), citizens: z.array(z.string()).min(1), accounts: z.record(z.string(), z.string()),
-    extrasOff: z.array(z.string()).default([]), cleanProfile: z.boolean().default(false) }),
+    extrasOff: z.array(z.string()).default([]), cleanProfile: z.boolean().default(false), mode: z.enum(["on-demand", "always-on"]).default("on-demand") }),
   output: Result.extend({ firstDesk: z.object({ citizen: z.string(), agentId: z.string().nullable() }).optional() }),
 });
 // The welcome take-over (ticket 009): whether this computer has seen it, and marking it seen.
@@ -40,3 +40,7 @@ export const finishRpc = defineRpc({ name: "setup.finish", input: z.object({}), 
 // The clean profile's sign-in (ticket 004): is the house's own Claude folder signed in, and start the browser sign-in.
 export const profileStatusRpc = defineRpc({ name: "setup.profile.status", input: z.object({}), output: z.object({ signedIn: z.boolean() }) });
 export const profileSignInRpc = defineRpc({ name: "setup.profile.signin", input: z.object({}), output: z.object({ started: z.boolean(), message: z.string() }) });
+// How the citizens run, changed after setup (ticket 004 Q11), and "Ask about this" on a setup choice: the lead's desk.
+export const modeSetRpc = defineRpc({ name: "setup.mode.set", input: z.object({ mode: z.enum(["on-demand", "always-on"]) }), output: z.object({ ok: z.boolean(), changed: z.array(z.string()), message: z.string().optional() }) });
+export const askRpc = defineRpc({ name: "setup.ask", input: z.object({ topic: z.string() }),
+  output: z.object({ ok: z.boolean(), agentId: z.string().optional(), citizen: z.string().optional(), message: z.string() }) });

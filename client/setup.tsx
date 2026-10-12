@@ -5,7 +5,9 @@ import { useRpc } from "@getpaseo/plugin/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { connectRpc, finishRpc, installRpc, installToolsRpc, profileSignInRpc, profileStatusRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
+import { connectRpc, finishRpc, installRpc, installToolsRpc, modeSetRpc, profileSignInRpc, profileStatusRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
+import { DEFAULT_MODE, type Mode } from "../shared/mode";
+import { ModeChoice } from "./mode";
 import { LeftAlone, Welcome } from "./welcome";
 import { TutorialView } from "./tutorial";
 import { PACKS, emptyPick, toggle, view, type Pick } from "../shared/picker";
@@ -52,6 +54,9 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const [pick, setPick] = useState<Pick>(emptyPick());
   const [accounts, setAccounts] = useState<Record<string, string>>({});
   const [extrasOff, setExtrasOff] = useState<string[]>([]);
+  // The form starts from the house's own mode (a screen reopened before Finish), until the user picks.
+  const [modePick, setMode] = useState<Mode | null>(null);
+  const doMode = useMutation({ mutationFn: useRpc(modeSetRpc), onSuccess: () => st.refetch() });
   // The clean profile (ticket 004): offered only when the user has Claude hooks of their own; default no.
   const [cleanProfile, setCleanProfile] = useState(false);
   const readProfile = useRpc(profileStatusRpc);
@@ -71,6 +76,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const d = st.data;
   if (!d) return <View style={s.screen}><View style={s.body}><Text style={s.muted}>{st.isError ? `Setup could not read this computer: ${String(st.error)}` : "Looking at this computer…"}</Text></View></View>;
   const v = view(pick);
+  const mode: Mode = modePick ?? d.mode ?? DEFAULT_MODE;
   const offered = d.packs.filter((p) => (PACKS as readonly string[]).includes(p.name));
   const ultronPack = d.packs.find((p) => p.name === "Ultron");
   const accountOf = (n: string) => accounts[n] ?? d.accounts[0] ?? "claude";
@@ -143,8 +149,12 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         )}
         {d.packs.some((p) => p.name === "Jarvis") && <Text style={s.muted}>Jarvis, the house manager, comes with every house.</Text>}
 
+        <Text style={s.h2}>5. How your citizens run</Text>
+        <Text style={s.muted}>You can change this after setup. Once your first citizen is up, you can ask it about this choice.</Text>
+        <ModeChoice s={s} mode={mode} onPick={setMode} askable={false} />
+
         {d.extras.length > 0 && <>
-          <Text style={s.h2}>5. Extras already on this computer</Text>
+          <Text style={s.h2}>6. Extras already on this computer</Text>
           <Text style={s.muted}>These extras reach every project on this computer, your new house too. Keep them, or switch one off for your house only. Nothing is deleted, and your other projects keep them.</Text>
           {d.extras.map((e) => {
             const off = extrasOff.includes(e.id);
@@ -177,7 +187,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         </>}
 
         <Pressable accessibilityRole="button" style={[s.button, (!v.citizens.length || !userName.trim() || doInstall.isPending || needsSignIn) && s.locked]} disabled={!v.citizens.length || !userName.trim() || doInstall.isPending || needsSignIn}
-          onPress={() => doInstall.mutate({ userName: userName.trim(), citizens: v.citizens, accounts: Object.fromEntries(v.citizens.map((n) => [n, accountOf(n)])), extrasOff, cleanProfile })}>
+          onPress={() => doInstall.mutate({ userName: userName.trim(), citizens: v.citizens, accounts: Object.fromEntries(v.citizens.map((n) => [n, accountOf(n)])), extrasOff, cleanProfile, mode })}>
           <Text style={s.buttonText}>{doInstall.isPending ? "Setting up…" : v.citizens.length ? `Start with ${v.citizens.map(label).join(", ")}` : "Pick someone to start with"}</Text>
         </Pressable>
         {doInstall.data && !doInstall.data.ok && <Text style={s.bad}>{doInstall.data.message}</Text>}
@@ -187,9 +197,17 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         <Text style={s.h2}>Your house is ready</Text>
         {doInstall.data?.steps.map((x) => <Text key={x} style={s.muted}>✓ {x}</Text>)}
         <Text style={s.p}>{label(doInstall.data?.firstDesk?.citizen ?? "")} has said hello in their workspace. Open it from the sidebar on the left.</Text>
+        <Text style={s.h2}>How your citizens run</Text>
+        <ModeChoice s={s} mode={d.mode} onPick={(m) => doMode.mutate({ mode: m })} busy={doMode.isPending} askable navigation={navigation} />
+        {doMode.data && !doMode.data.ok && <Text style={s.bad}>{doMode.data.message}</Text>}
         <Pressable accessibilityRole="button" style={s.button} onPress={() => doFinish.mutate({})}><Text style={s.buttonText}>Finish setup</Text></Pressable>
       </>}
       {d.setupDone && <Text style={s.good}>Setup is finished. Your citizens live in the sidebar. Go to them through their workspace any time.</Text>}
+      {d.setupDone && <>
+        <Text style={s.h2}>How your citizens run</Text>
+        <ModeChoice s={s} mode={d.mode} onPick={(m) => doMode.mutate({ mode: m })} busy={doMode.isPending} askable navigation={navigation} />
+        {doMode.data && !doMode.data.ok && <Text style={s.bad}>{doMode.data.message}</Text>}
+      </>}
       {d.setupDone && <TutorialView s={s} theme={theme} compact={layout.compact} navigation={navigation} />}
     </View></ScrollView>
   );
