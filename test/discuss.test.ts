@@ -1,4 +1,4 @@
-// "Discuss this page" (ticket 009; Sean, 2026-10-08: "it opens it back up with Ultron or whichever is the main citizen
+// "Discuss this page" (ticket 009; the owner, 2026-10-08: "it opens it back up with Ultron or whichever is the main citizen
 // involved in the tutorial"; Ultron's order of 2026-10-12 19:45Z, step 2): the lead citizen's desk gets one line naming
 // the item, and the screen opens that desk. No desk: one is opened with that line first.
 //   node --test test/discuss.test.ts
