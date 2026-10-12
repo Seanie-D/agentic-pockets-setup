@@ -16,7 +16,7 @@ function upstream() {
   for (const n of ["Ultron", "Jarvis", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
   return u;
 }
-function world(opts: { claim?: number } = {}) {
+function world(opts: { claim?: number; cafeFails?: boolean } = {}) {
   const up = upstream(); const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-")); const root = path.join(home, "agentic-pockets");
   const log: string[] = []; const posts: any[] = [];
   const deps: Deps = {
@@ -38,6 +38,7 @@ function world(opts: { claim?: number } = {}) {
       setIcon: async (projectId, png) => { log.push(`icon ${projectId} ${fs.readFileSync(png, "utf8")}`); },
       addPlugin: async (id, dir) => { log.push(`plugin ${id} ${dir}`); return { running: true }; },
       addProvider: async (id, configDir) => { log.push(`provider ${id} ${configDir}`); },
+      installGitPlugin: async (source) => { log.push(`gitplugin ${source}`); if (opts.cafeFails) throw new Error("no paseo command"); },
       welcome: async (agentId, citizen) => { log.push(`welcome ${agentId} ${citizen}`); },
       openDesk: async (o) => { log.push(`desk ${o.title} ${o.provider}/${o.model} ${JSON.stringify(o.labels)} cwd=${o.cwd}`); return { agentId: "agent-1" }; },
     },
@@ -305,4 +306,30 @@ test("a first run that fails after placing the pockets keeps their tiers and the
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Ultron", "Verro", "Vision"], accounts, root: w.root, home: w.home }, w.deps);
   assert.equal(r.ok, true, r.message);
   for (const n of ["Ultron", "Verro", "Vision", "Jarvis"]) assert.equal(tierIn(w.root, n), "on-call", n);
+});
+
+// The Paseo Cafe (ticket 009, settled 2026-10-12 15:18 CDT): setup offers it, default off; the tutorial's Cafe page shows
+// only when it is in Paseo.
+test("the Paseo Cafe: added only when the user ticks it, from its own Git source", async () => {
+  let w = world();
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.ok(!w.log.some((l) => l.startsWith("gitplugin")), "default off");
+  w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home, cafe: true }, w.deps);
+  assert.ok(w.log.includes("gitplugin git:https://github.com/paseo-cafe/paseo-cafe.git:plugin"));
+  assert.ok(r.steps.includes("Added the Paseo Cafe to Paseo."));
+});
+
+test("the Paseo Cafe: when it cannot be added, setup goes on and says where to add it by hand", async () => {
+  const w = world({ cafeFails: true });
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home, cafe: true }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.ok(r.steps.some((x) => x.includes("Settings, Plugins") && x.includes("git:https://github.com/paseo-cafe/paseo-cafe.git:plugin")));
+});
+
+test("a citizen not in this release stops the run before any pocket is placed", async () => {
+  const w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro", "Nobody"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, false);
+  assert.ok(!fs.existsSync(path.join(w.root, "Pockets", "Verro")), "nothing placed");
 });

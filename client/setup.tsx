@@ -8,6 +8,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { connectRpc, finishRpc, installRpc, installToolsRpc, modeSetRpc, profileSignInRpc, profileStatusRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
 import { DEFAULT_MODE, type Mode } from "../shared/mode";
 import { ModeChoice } from "./mode";
+import { CAFE } from "../shared/cafe";
 import { LeftAlone, Welcome } from "./welcome";
 import { TutorialView } from "./tutorial";
 import { PACKS, emptyPick, toggle, view, type Pick } from "../shared/picker";
@@ -54,6 +55,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const [pick, setPick] = useState<Pick>(emptyPick());
   const [accounts, setAccounts] = useState<Record<string, string>>({});
   const [extrasOff, setExtrasOff] = useState<string[]>([]);
+  const [cafe, setCafe] = useState(false);   // the Paseo Cafe: offered, default off (ticket 009)
   // The form starts from the house's own mode (a screen reopened before Finish), until the user picks.
   const [modePick, setMode] = useState<Mode | null>(null);
   const doMode = useMutation({ mutationFn: useRpc(modeSetRpc), onSuccess: () => st.refetch() });
@@ -98,6 +100,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         </View>
       ))}
       {doTools.data?.tools.filter((t) => t.message).map((t) => <Text key={`m-${t.name}`} style={s.bad}>{t.name}: {t.message}</Text>)}
+      {doTools.isError && <Text style={s.bad}>{String(doTools.error)}</Text>}
       {!toolsOk && <View style={s.row}>
         <Pressable accessibilityRole="button" style={[s.button, doTools.isPending && s.locked]} disabled={doTools.isPending} onPress={() => doTools.mutate({})}>
           <Text style={s.buttonText}>{doTools.isPending ? "Installing… this can take a few minutes" : "Install or update"}</Text>
@@ -116,6 +119,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
           </Pressable>
           {!toolsOk && <Text style={s.muted}>First get the tools above, then connect.</Text>}
           {doConnect.data && !doConnect.data.ok && <Text style={s.bad}>{doConnect.data.message}</Text>}
+          {doConnect.isError && <Text style={s.bad}>{String(doConnect.error)}</Text>}
         </View>
       )}
 
@@ -183,14 +187,19 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
             : <>
               <Pressable accessibilityRole="button" style={[s.quiet, { alignSelf: "flex-start" }]} disabled={signIn.isPending} onPress={() => signIn.mutate({})}><Text style={s.quietText}>Sign in to Claude for your house</Text></Pressable>
               {signIn.data && <Text style={signIn.data.started ? s.muted : s.bad}>{signIn.data.message}</Text>}
+              {signIn.isError && <Text style={s.bad}>{String(signIn.error)}</Text>}
             </>)}
         </>}
 
+        {!d.cafe && <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: cafe }} style={[s.card, cafe && s.picked]} onPress={() => setCafe(!cafe)}>
+          <Text style={s.p}>{cafe ? "☑" : "☐"}  {CAFE.offer}</Text>
+        </Pressable>}
         <Pressable accessibilityRole="button" style={[s.button, (!v.citizens.length || !userName.trim() || doInstall.isPending || needsSignIn) && s.locked]} disabled={!v.citizens.length || !userName.trim() || doInstall.isPending || needsSignIn}
-          onPress={() => doInstall.mutate({ userName: userName.trim(), citizens: v.citizens, accounts: Object.fromEntries(v.citizens.map((n) => [n, accountOf(n)])), extrasOff, cleanProfile, mode })}>
+          onPress={() => doInstall.mutate({ userName: userName.trim(), citizens: v.citizens, accounts: Object.fromEntries(v.citizens.map((n) => [n, accountOf(n)])), extrasOff, cleanProfile, mode, cafe: cafe && !d.cafe })}>
           <Text style={s.buttonText}>{doInstall.isPending ? "Setting up…" : v.citizens.length ? `Start with ${v.citizens.map(label).join(", ")}` : "Pick someone to start with"}</Text>
         </Pressable>
         {doInstall.data && !doInstall.data.ok && <Text style={s.bad}>{doInstall.data.message}</Text>}
+        {doInstall.isError && <Text style={s.bad}>Setup stopped: {String(doInstall.error)}. Press the button again to go on.</Text>}
       </>}
 
       {installed && !d.setupDone && <>
@@ -202,6 +211,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         {doMode.data && !doMode.data.ok && <Text style={s.bad}>{doMode.data.message}</Text>}
         {doMode.isError && <Text style={s.bad}>{String(doMode.error)}</Text>}
         <Pressable accessibilityRole="button" style={s.button} onPress={() => doFinish.mutate({})}><Text style={s.buttonText}>Finish setup</Text></Pressable>
+        {doFinish.isError && <Text style={s.bad}>{String(doFinish.error)}</Text>}
       </>}
       {d.setupDone && <Text style={s.good}>Setup is finished. Your citizens live in the sidebar. Go to them through their workspace any time.</Text>}
       {d.setupDone && <TutorialView s={s} theme={theme} compact={layout.compact} navigation={navigation} />}

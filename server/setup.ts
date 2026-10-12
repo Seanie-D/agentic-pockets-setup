@@ -8,6 +8,7 @@ import { DESK_WELCOME_ON } from "../shared/desk-welcome.ts";
 import { season } from "./seasonings.ts";
 import { applyExtrasOff, type Extra } from "./tools.ts";
 import { DEFAULT_MODE, tierFor, withTier, type Mode } from "../shared/mode.ts";
+import { CAFE } from "../shared/cafe.ts";
 
 export interface Exec { (cmd: string, args: string[], o?: { env?: Record<string, string>; cwd?: string }): { status: number | null; stdout: string; stderr: string } }
 export interface Ops {
@@ -15,11 +16,12 @@ export interface Ops {
   setIcon(projectId: string, pngPath: string): Promise<void>;
   addPlugin(id: string, dir: string): Promise<{ running: boolean }>;
   addProvider(id: string, configDir: string): Promise<void>;
+  installGitPlugin(source: string): Promise<void>;
   welcome(agentId: string, citizen: string): Promise<void>;
   openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
 }
 export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; doorman: string; now: () => string }
-export interface SetupInput { code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean; welcome?: boolean; mode?: Mode }
+export interface SetupInput { code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean; welcome?: boolean; mode?: Mode; cafe?: boolean }
 export interface SetupResult { ok: boolean; message: string; steps: string[]; firstDesk?: { citizen: string; agentId: string | null } }
 
 // The first line of the first desk (ticket 004 Q11): setup is not finished, so the citizen says hello, sends the user
@@ -131,11 +133,10 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   // A newly placed folder gets the user's own name in its {{USER_NAME}} slots (the tenets, Q6); a folder already here is not touched.
   const placedNow: string[] = [];
   const put = (rel: string) => { const to = path.join(input.root, rel); if (!fs.existsSync(to)) { fs.cpSync(path.join(upstream, rel), to, { recursive: true, verbatimSymlinks: true }); fillName(to, name); placedNow.push(to); } };
+  const missing = input.citizens.find((n) => !fs.existsSync(path.join(upstream, "Pockets", n)));
+  if (missing) return fail(`${missing} is not in this release of the house.`);   // before anything is placed
   for (const rel of ["Commons", path.join("Pockets", "_Template")]) if (fs.existsSync(path.join(upstream, rel))) put(rel);
-  for (const n of input.citizens) {
-    if (!fs.existsSync(path.join(upstream, "Pockets", n))) return fail(`${n} is not in this release of the house.`);
-    put(path.join("Pockets", n));
-  }
+  for (const n of input.citizens) put(path.join("Pockets", n));
   steps.push(`Placed ${input.citizens.join(", ")} in ${input.root}.`);
   // How the citizens run (Q11): on demand unless the user picked always on; a run that names no mode keeps the house's.
   // A pocket placed now takes it; one setup placed in an earlier run takes it only when the mode changes; a pocket the user
@@ -161,6 +162,12 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
       steps.push(running ? "Added the house plugin to Paseo." : "Added the house plugin to Paseo. It starts the next time Paseo starts: quit Paseo and open it again.");
     }
     catch (e) { steps.push(`Setup could not add the house plugin to Paseo (${String((e as Error)?.message ?? e).slice(0, 160)}). Your citizens work without it, but nothing wakes them on mail or closes them at night until it is added.`); }
+  }
+
+  // The Paseo Cafe, only when the user ticked it; the house works without it.
+  if (input.cafe) {
+    try { await deps.ops.installGitPlugin(CAFE.source); steps.push("Added the Paseo Cafe to Paseo."); }
+    catch (e) { steps.push(`Setup could not add the Paseo Cafe (${String((e as Error)?.message ?? e).slice(0, 160)}). You can add it in Paseo: Settings, Plugins, Plugin source: ${CAFE.source}`); }
   }
 
   // Ticket 004 Q8: the extras the user switched off, for this house only, written before any desk starts (Claude Code reads

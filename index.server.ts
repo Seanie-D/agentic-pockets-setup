@@ -32,7 +32,8 @@ export default function contribute(server: PluginServerContext) {
       .filter((p) => p.available !== false).map((p) => String(p.provider ?? p.id))).catch(() => ["claude"]);
     return { tools: checkTools(exec), extras: listExtras(os.homedir()), root: ROOT, connected: fs.existsSync(path.join(ROOT, ".upstream")),
       packs: packsIn(ROOT), accounts: accounts.length ? accounts : ["claude"], setupDone: record().setupDone === true,
-      mode: record().mode === "always-on" ? "always-on" as const : "on-demand" as const };
+      mode: record().mode === "always-on" ? "always-on" as const : "on-demand" as const,
+      cafe: await paseo.config.get().then(({ config }) => !!(config as { plugins?: Record<string, unknown> }).plugins?.["paseo-cafe"]).catch(() => false) };
   });
   server.handle(welcomeReadRpc, async () => ({ seen: welcomeSeen(os.homedir()) }));
   server.handle(welcomeDismissRpc, async () => { markWelcomeSeen(os.homedir(), new Date().toISOString()); return { seen: true }; });
@@ -49,10 +50,10 @@ export default function contribute(server: PluginServerContext) {
   server.handle(profileSignInRpc, async () => startSignIn(profileDir(os.homedir())));
   server.handle(modeSetRpc, async ({ mode }) => setMode(ROOT, mode));
   server.handle(askRpc, async ({ topic }, { paseo }) => ask(ROOT, topic, discussDeps(paseo)));
-  server.handle(installRpc, async ({ userName, citizens, accounts, extrasOff, cleanProfile, mode }, { paseo }) => {
+  server.handle(installRpc, async ({ userName, citizens, accounts, extrasOff, cleanProfile, mode, cafe }, { paseo }) => {
     // The clean profile needs its sign-in first: a signed-out folder would greet the user with "Not logged in".
     if (cleanProfile && !signedIn(exec, os.homedir())) return { ok: false, message: "Sign in to Claude for your house first, or switch the clean profile off.", steps: [] };
-    return install({ code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, cleanProfile, mode, root: ROOT, home: os.homedir() }, deps(paseo));
+    return install({ code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, cleanProfile, mode, cafe, root: ROOT, home: os.homedir() }, deps(paseo));
   });
   server.handle(finishRpc, async () => {
     const rec = record(); fs.writeFileSync(path.join(ROOT, "house.json"), JSON.stringify({ ...rec, setupDone: true, updatedAt: new Date().toISOString() }, null, 2) + "\n");
