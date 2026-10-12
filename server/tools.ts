@@ -33,30 +33,45 @@ const QUIET = ["--silent", "--accept-package-agreements", "--accept-source-agree
 
 export interface Installed extends Tool { action: "kept" | "installed" | "updated" | "not done"; message?: string }
 
-export function installTools(run: Run, platform: NodeJS.Platform): Installed[] {
+const lastLine = (out: string) => out.trim().split(/\r?\n/).filter(Boolean).pop()?.slice(0, 200) ?? "";
+
+// Homebrew on a Mac belongs to the user who installed it; a second user of that Mac cannot write to it (the first-run test
+// is a new macOS user on the JHS MacBook).
+const canWrite = (dir: string) => { try { fs.accessSync(dir, fs.constants.W_OK); return true; } catch { return false; } };
+
+export function installTools(run: Run, platform: NodeJS.Platform, writable: (dir: string) => boolean = canWrite): Installed[] {
   const brew = platform === "darwin" && run("brew", ["--version"]).status === 0;
+  const brewPrefix = brew ? run("brew", ["--prefix"]).stdout.trim() : "";
+  const brewTheirs = brew && !!brewPrefix && !writable(brewPrefix);
   const winget = platform === "win32" && run("winget", ["--version"]).status === 0;
   return NEED.map((t) => {
     const before = checkOne(run, t);
     if (before.state === "ok") return { ...before, action: "kept" };
     if (t.name === "paseo") return { ...before, action: "not done", message: "Update Paseo from its own menu, or from paseo.sh." };
     const pkg = BREW[t.name];
+    let why = "", wholeComputer = false;
     if (platform === "darwin") {
       if (!brew) return { ...before, action: "not done", message: "Homebrew comes first: it installs the other tools. Get it from brew.sh (it asks for your Mac password once), then press Install again." };
+      if (brewTheirs) return { ...before, action: "not done", message: `Homebrew on this Mac belongs to another user, so it cannot install for you. Ask the person who set up this Mac to install ${t.name} for everyone, or set up the Agentic Pockets on their account.` };
       const managed = before.state === "old" && run("brew", ["list", "--versions", ...pkg]).status === 0;
       run("brew", [managed ? "upgrade" : "install", ...pkg]);
     } else if (platform === "win32") {
       if (!winget) return { ...before, action: "not done", message: "winget comes first: it installs the other tools. Get App Installer from the Microsoft Store, then press Install again." };
       const id = ["--id", WINGET[t.name], "--exact"];
       const managed = before.state === "old" && run("winget", ["list", ...id, "--accept-source-agreements"]).status === 0;
-      // This user only, so no admin prompt; a tool with no per-user installer falls back to the whole computer,
-      // which may show Windows' own "allow changes" prompt for the user to click.
-      if (managed) run("winget", ["upgrade", ...id, ...QUIET]);
-      else if (run("winget", ["install", ...id, "--scope", "user", ...QUIET]).status !== 0) run("winget", ["install", ...id, ...QUIET]);
+      // This user only, so no admin prompt. Only a tool with no per-user installer falls back to the whole computer,
+      // which shows Windows' own "allow changes" prompt for the user to click; any other failure stops with its reason.
+      if (managed) { const u = run("winget", ["upgrade", ...id, ...QUIET]); if (u.status !== 0) why = lastLine(u.stdout); }
+      else {
+        const u = run("winget", ["install", ...id, "--scope", "user", ...QUIET]);
+        if (u.status !== 0 && /No applicable installer/i.test(u.stdout)) { wholeComputer = true; const m = run("winget", ["install", ...id, ...QUIET]); if (m.status !== 0) why = lastLine(m.stdout); }
+        else if (u.status !== 0) why = lastLine(u.stdout);
+      }
     } else return { ...before, action: "not done", message: `Install ${t.name} ${t.need} or newer with your system's package manager.` };
     const after = checkOne(run, t);
     const action = after.state !== "ok" ? "not done" : before.state === "missing" ? "installed" : "updated";
-    return { ...after, action, ...(after.state !== "ok" ? { message: `${t.name} is still ${after.state === "old" ? "too old" : "missing"} after the install.` } : {}) };
+    if (after.state !== "ok") return { ...after, action, message: `${t.name} is still ${after.state === "old" ? "too old" : "missing"} after the install.${why ? ` The installer said: ${why}` : ""}` };
+    return { ...after, action, ...(wholeComputer ? { message: `${t.name} has no installer for one user, so it was installed for the whole computer. That is why Windows asked you to allow changes.` } : {}) };
   });
 }
 
