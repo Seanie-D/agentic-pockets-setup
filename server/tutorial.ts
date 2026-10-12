@@ -1,0 +1,39 @@
+// The tutorial's frame (ticket 009). The checklist is the house's own (Commons/tutorial/items.json). Each citizen writes
+// its own ticks in its own pocket (tutorial/ticks.json: item id → when), one writer per folder, and this adds them up.
+// At 100 % the lead citizen (Ultron when he is in the house) leaves its drawing and its line in tutorial/ beside its ticks.
+import fs from "node:fs";
+import path from "node:path";
+
+export const LABEL_DURING = "Agentic Pockets setup";
+export const LABEL_AFTER = "Agentic Pockets Help";   // Ultron's pick for after 100 %, with the owner for a ruling
+
+export interface Item { id: string; title: string; body: string; done: { at: string; by: string } | null }
+export interface Tutorial { items: Item[]; percent: number; complete: boolean; label: string; reward: { citizen: string; image: string | null; line: string | null } | null }
+
+const readJson = (f: string) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return null; } };
+
+export function readTutorial(root: string): Tutorial {
+  // A house with the JHS skills adds their own items (Commons/skills/jhs/tutorial-items.json), so JHS words stay in that folder.
+  const list = [...(readJson(path.join(root, "Commons", "tutorial", "items.json")) ?? []), ...(readJson(path.join(root, "Commons", "skills", "jhs", "tutorial-items.json")) ?? [])] as Omit<Item, "done">[];
+  const items: Item[] = list.map((i) => ({ ...i, done: null }));
+  const pockets = path.join(root, "Pockets");
+  let names: string[] = []; try { names = fs.readdirSync(pockets).filter((n) => !n.startsWith(".") && !n.startsWith("_")); } catch { /* no house yet */ }
+  for (const by of names) {
+    const ticks = readJson(path.join(pockets, by, "tutorial", "ticks.json")) ?? {};
+    for (const i of items) {
+      const at = ticks[i.id];
+      if (typeof at === "string" && (!i.done || at < i.done.at)) i.done = { at, by };
+    }
+  }
+  const done = items.filter((i) => i.done).length;
+  const complete = items.length > 0 && done === items.length;
+  const lead = names.includes("Ultron") ? "Ultron" : ((readJson(path.join(root, "house.json"))?.citizens ?? []) as string[]).find((n) => n !== "Jarvis") ?? null;
+  let reward: Tutorial["reward"] = null;
+  if (complete && lead) {
+    const dir = path.join(pockets, lead, "tutorial");
+    const image = path.join(dir, "reward.png");
+    let line: string | null = null; try { line = fs.readFileSync(path.join(dir, "reward.md"), "utf8").trim() || null; } catch { /* still drawing */ }
+    reward = { citizen: lead, image: fs.existsSync(image) ? image : null, line };
+  }
+  return { items, percent: items.length ? Math.round((done / items.length) * 100) : 0, complete, label: complete ? LABEL_AFTER : LABEL_DURING, reward };
+}

@@ -25,4 +25,9 @@ export const installRpc = defineRpc({
 // The welcome take-over (ticket 009): whether this computer has seen it, and marking it seen.
 export const welcomeReadRpc = defineRpc({ name: "setup.welcome.read", input: z.object({}), output: z.object({ seen: z.boolean() }) });
 export const welcomeDismissRpc = defineRpc({ name: "setup.welcome.dismiss", input: z.object({}), output: z.object({ seen: z.boolean() }) });
+// The tutorial (ticket 009): the house's checklist with each item's tick, the percent, the sidebar label, the reward.
+export const tutorialReadRpc = defineRpc({ name: "setup.tutorial.read", input: z.object({}), output: z.object({
+  items: z.array(z.object({ id: z.string(), title: z.string(), body: z.string(), done: z.object({ at: z.string(), by: z.string() }).nullable() })),
+  percent: z.number(), complete: z.boolean(), label: z.string(),
+  reward: z.object({ citizen: z.string(), image: z.string().nullable(), line: z.string().nullable() }).nullable() }) });
 export const finishRpc = defineRpc({ name: "setup.finish", input: z.object({}), output: z.object({ ok: z.boolean() }) });

@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/picker.test.ts test/tools.test.ts test/run.test.ts test/install.test.ts"
+    "test": "node --test test/picker.test.ts test/tools.test.ts test/run.test.ts test/install.test.ts test/welcome.test.ts test/tutorial.test.ts"
   },
   "devDependencies": {
     "@getpaseo/plugin": "0.11.2",

@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { connectRpc, finishRpc, installRpc, installToolsRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
 import { LeftAlone, Welcome } from "./welcome";
+import { TutorialView } from "./tutorial";
 import { PACKS, emptyPick, toggle, view, type Pick } from "../shared/picker";
 import { openExternal } from "./web";
 
@@ -167,6 +168,7 @@ export function SetupScreen({ theme, layout }: PluginScreenProps) {
         <Pressable accessibilityRole="button" style={s.button} onPress={() => doFinish.mutate({})}><Text style={s.buttonText}>Finish setup</Text></Pressable>
       </>}
       {d.setupDone && <Text style={s.good}>Setup is finished. Your citizens live in the sidebar. Go to them through their workspace any time.</Text>}
+      {d.setupDone && <TutorialView s={s} />}
     </View></ScrollView>
   );
 }

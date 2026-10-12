@@ -5,8 +5,9 @@ import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { connect, install, packsIn } from "./server/setup";
 import { checkTools, installTools, listExtras } from "./server/tools";
 import { deps, exec } from "./server/real";
-import { connectRpc, finishRpc, installRpc, installToolsRpc, status, welcomeDismissRpc, welcomeReadRpc } from "./shared/contracts";
+import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialReadRpc, welcomeDismissRpc, welcomeReadRpc } from "./shared/contracts";
 import { markWelcomeSeen, welcomeSeen } from "./server/welcome";
+import { readTutorial } from "./server/tutorial";
 
 // The house goes in the user's home folder, beside anything they already have (ticket 004 Q7: earlier projects untouched).
 const ROOT = path.join(os.homedir(), "agentic-pockets");
@@ -21,6 +22,12 @@ export default function contribute(server: PluginServerContext) {
   });
   server.handle(welcomeReadRpc, async () => ({ seen: welcomeSeen(os.homedir()) }));
   server.handle(welcomeDismissRpc, async () => { markWelcomeSeen(os.homedir(), new Date().toISOString()); return { seen: true }; });
+  server.handle(tutorialReadRpc, async () => {
+    const t = readTutorial(ROOT);
+    // A screen cannot read a file path, so the drawing travels as data.
+    const image = t.reward?.image ? `data:image/png;base64,${fs.readFileSync(t.reward.image).toString("base64")}` : null;
+    return { ...t, items: t.items.map(({ id, title, body, done }) => ({ id, title, body, done })), reward: t.reward ? { ...t.reward, image } : null };
+  });
   server.handle(installToolsRpc, async () => ({ tools: installTools(exec, process.platform) }));
   server.handle(connectRpc, async ({ code }, { paseo }) => connect({ code, root: ROOT, home: os.homedir() }, deps(paseo)));
   server.handle(installRpc, async ({ userName, citizens, accounts, extrasOff }, { paseo }) => {

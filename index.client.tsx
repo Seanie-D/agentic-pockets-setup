@@ -4,7 +4,7 @@ import { SidebarRow } from "@getpaseo/plugin/client/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { SetupScreen } from "./client/setup";
-import { welcomeReadRpc } from "./shared/contracts";
+import { tutorialReadRpc, welcomeReadRpc } from "./shared/contracts";
 import { takeOver } from "./shared/welcome";
 
 // No install hook opens a screen, so this item takes the screen over when it first renders (ticket 009): once, while
@@ -19,7 +19,10 @@ function SetupItem({ currentScreen, openScreen }: PluginSidebarItemProps) {
     g.__agenticPocketsWelcomeOpened = true;
     openScreen({ screenId: "setup" });
   }, [welcome.data?.seen, openScreen]);
-  return <SidebarRow icon="Sparkles" active={currentScreen?.screenId === "setup"} onPress={() => openScreen({ screenId: "setup" })} />;
+  // The label changes once the tutorial is complete (ticket 009); the item stays as the way into help.
+  const readTutorial = useRpc(tutorialReadRpc);
+  const tutorial = useQuery({ queryKey: ["setup.tutorial.read"], queryFn: () => readTutorial({}), refetchInterval: 60_000 });
+  return <SidebarRow icon="Sparkles" label={tutorial.data?.label} active={currentScreen?.screenId === "setup"} onPress={() => openScreen({ screenId: "setup" })} />;
 }
 
 export default function contribute(client: PluginClientContext) {
