@@ -40,3 +40,8 @@ export const finishRpc = defineRpc({ name: "setup.finish", input: z.object({}), 
 // The clean profile's sign-in (ticket 004): is the house's own Claude folder signed in, and start the browser sign-in.
 export const profileStatusRpc = defineRpc({ name: "setup.profile.status", input: z.object({}), output: z.object({ signedIn: z.boolean() }) });
 export const profileSignInRpc = defineRpc({ name: "setup.profile.signin", input: z.object({}), output: z.object({ started: z.boolean(), message: z.string() }) });
+// Agentic Pockets Help (ticket 009 Q1c): the house's glossary, and "Ask Ultron about this" on a word or a page.
+export const helpGlossaryRpc = defineRpc({ name: "setup.help.glossary", input: z.object({}),
+  output: z.object({ terms: z.array(z.object({ word: z.string(), meaning: z.string(), not: z.string().optional() })) }) });
+export const helpAskRpc = defineRpc({ name: "setup.help.ask", input: z.object({ kind: z.enum(["term", "page"]), id: z.string() }),
+  output: z.object({ ok: z.boolean(), agentId: z.string().optional(), citizen: z.string().optional(), message: z.string() }) });
