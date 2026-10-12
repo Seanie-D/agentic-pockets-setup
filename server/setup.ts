@@ -114,9 +114,15 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
     if (w.projectId && fs.existsSync(face)) await deps.ops.setIcon(w.projectId, face).catch(() => { /* a face is nice, not needed */ });
   }
   steps.push("Made a Paseo workspace for each citizen.");
+  // Each citizen's desk row: what the house plugin opens a desk with (its Mailman and clock-in).
+  const desks: Record<string, { provider: string; model: string; workspaceId: string }> = {};
+  for (const n of input.citizens) {
+    const provider = input.accounts[n] ?? "claude";
+    desks[n] = { provider, model: input.models?.[n] ?? DEFAULT_MODEL[provider] ?? "default", workspaceId: spaces[n] };
+  }
   const first = input.citizens.includes("Ultron") ? "Ultron" : input.citizens[0];
-  const provider = input.accounts[first] ?? "claude";
-  const desk = await deps.ops.openDesk({ workspaceId: spaces[first], cwd: path.join(input.root, "Pockets", first), provider, model: input.models?.[first] ?? DEFAULT_MODEL[provider] ?? "default",
+  const provider = desks[first].provider;
+  const desk = await deps.ops.openDesk({ workspaceId: spaces[first], cwd: path.join(input.root, "Pockets", first), provider, model: desks[first].model,
     title: `${first} — desk`, labels: { role: "desk" }, firstLine: SETUP_LINE });
   steps.push(`Opened ${first}'s desk.`);
 
@@ -124,6 +130,6 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   const recFile = path.join(input.root, "house.json");
   let rec: Record<string, unknown> = {}; try { rec = JSON.parse(fs.readFileSync(recFile, "utf8")); } catch { /* first run */ }
   const citizens = [...new Set([...((rec.citizens as string[]) ?? []), ...input.citizens])].sort();
-  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, citizens, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
+  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
   return { ok: true, message: `${first} is ready. Finish setup here, then say hello.`, steps, firstDesk: { citizen: first, agentId: desk.agentId } };
 }

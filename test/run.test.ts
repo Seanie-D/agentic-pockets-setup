@@ -100,3 +100,14 @@ test("no name, no run: setup asks for it before anything is placed", async () =>
   assert.equal(r.ok, false); assert.match(r.message, /name/i);
   assert.ok(!fs.existsSync(w.root));
 });
+
+test("the house record keeps each citizen's desk row (account, model, workspace), so the house plugin can open its desks", async () => {
+  const w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Ultron", "Verro"], accounts: { Ultron: "claude", Verro: "claude" }, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.deepEqual(rec.desks, {
+    Ultron: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Ultron" },
+    Verro: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Verro" },
+  });
+});
