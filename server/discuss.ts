@@ -55,6 +55,6 @@ export function askLine(topic: string): string {
   return `[SETUP] The user pressed "Ask about this" on "${t.title}" in Agentic Pockets Setup. The choices: ${t.body()} Explain it to them in plain words, in your own way, help them pick, and answer what they ask.`;
 }
 export async function ask(root: string, topic: string, deps: DiscussDeps): Promise<{ ok: boolean; agentId?: string; citizen?: string; message: string }> {
-  if (!TOPICS[topic]) return { ok: false, message: `"${topic}" is not a setup choice.` };
+  if (!Object.hasOwn(TOPICS, topic)) return { ok: false, message: `"${topic}" is not a setup choice.` };
   return toLead(root, askLine(topic), `your question about "${TOPICS[topic].title}"`, deps);
 }

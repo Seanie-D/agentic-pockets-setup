@@ -95,13 +95,14 @@ function setTier(pocket: string, mode: Mode): boolean {
   return true;
 }
 
-// The same choice after setup: every citizen in the house record takes it, and the record keeps it.
-export function setMode(root: string, mode: Mode): { changed: string[] } {
+// The same choice after setup: every pocket setup placed takes it, and the record keeps it.
+export function setMode(root: string, mode: Mode): { ok: boolean; changed: string[]; message?: string } {
   const recFile = path.join(root, "house.json");
-  const rec = JSON.parse(fs.readFileSync(recFile, "utf8"));
-  const changed = ((rec.citizens as string[]) ?? []).filter((n) => setTier(path.join(root, "Pockets", n), mode)).sort();
+  let rec: Record<string, unknown>;
+  try { rec = JSON.parse(fs.readFileSync(recFile, "utf8")); } catch { return { ok: false, changed: [], message: "This house has no house record yet. Finish setup first." }; }
+  const changed = ((rec.placedCitizens as string[]) ?? []).filter((n) => setTier(path.join(root, "Pockets", n), mode)).sort();
   fs.writeFileSync(recFile, JSON.stringify({ ...rec, mode, updatedAt: new Date().toISOString() }, null, 2) + "\n");
-  return { changed };
+  return { ok: true, changed };
 }
 
 function fillName(dir: string, name: string) {
@@ -136,12 +137,15 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
     put(path.join("Pockets", n));
   }
   steps.push(`Placed ${input.citizens.join(", ")} in ${input.root}.`);
-  // How the citizens run (Q11): on demand unless the user picked always on. Only a newly placed pocket takes it.
-  const mode = input.mode ?? DEFAULT_MODE;
-  for (const n of input.citizens) {
-    const dir = path.join(input.root, "Pockets", n);
-    if (placedNow.includes(dir)) setTier(dir, mode);
-  }
+  // How the citizens run (Q11): on demand unless the user picked always on; a run that names no mode keeps the house's.
+  // A pocket placed now takes it; one setup placed in an earlier run takes it only when the mode changes; a pocket the user
+  // had before setup stays as it is.
+  let before: Record<string, unknown> = {}; try { before = JSON.parse(fs.readFileSync(path.join(input.root, "house.json"), "utf8")); } catch { /* first run */ }
+  const mode: Mode = input.mode ?? (before.mode === "always-on" ? "always-on" : DEFAULT_MODE);
+  const earlier = (before.placedCitizens as string[]) ?? [];
+  const now = input.citizens.filter((n) => placedNow.includes(path.join(input.root, "Pockets", n)));
+  const placedCitizens = [...new Set([...earlier, ...now])].sort();
+  for (const n of mode === before.mode ? now : placedCitizens) setTier(path.join(input.root, "Pockets", n), mode);
 
   // Ticket 004 Q2: the house plugin travels with setup. It holds the house's machinery (the Mailman, the nightly clock-out,
   // the save point) and its views, so it is placed in the house and added to Paseo before any desk opens. A folder already
@@ -209,6 +213,6 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   const recFile = path.join(input.root, "house.json");
   let rec: Record<string, unknown> = {}; try { rec = JSON.parse(fs.readFileSync(recFile, "utf8")); } catch { /* first run */ }
   const citizens = [...new Set([...((rec.citizens as string[]) ?? []), ...input.citizens])].sort();
-  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off, extrasSettings: extrasSettingsOut } : {}), seasonSettings: sz.settings, desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, mode, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
+  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off, extrasSettings: extrasSettingsOut } : {}), seasonSettings: sz.settings, desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, placedCitizens, mode, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
   return { ok: true, message: `${first} is ready. Finish setup here, then say hello.`, steps, firstDesk: { citizen: first, agentId: desk.agentId } };
 }

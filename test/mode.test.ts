@@ -25,7 +25,7 @@ test("the always-on choice carries the owner's warning, word for word; on demand
 function house(citizens: string[]) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "house-"));
   for (const n of citizens) { fs.mkdirSync(path.join(root, "Pockets", n), { recursive: true }); fs.writeFileSync(path.join(root, "Pockets", n, "AGENTS.md"), `---\nname: ${n}\ntier: on-call\n---\n# ${n}\n`); }
-  fs.writeFileSync(path.join(root, "house.json"), JSON.stringify({ citizens, mode: "on-demand", desks: Object.fromEntries(citizens.map((n) => [n, { provider: "claude", model: "m", workspaceId: `wks_${n}` }])) }));
+  fs.writeFileSync(path.join(root, "house.json"), JSON.stringify({ citizens, placedCitizens: citizens, mode: "on-demand", desks: Object.fromEntries(citizens.map((n) => [n, { provider: "claude", model: "m", workspaceId: `wks_${n}` }])) }));
   return root;
 }
 
@@ -48,4 +48,29 @@ test("Ask about this: the lead's desk gets one line naming the choice and its wo
   assert.match(askLine("mode"), /^\[SETUP\] The user pressed "Ask about this" on "How your citizens run"/);
   assert.ok(askLine("mode").includes(MODES["always-on"].text) && askLine("mode").includes(MODES["on-demand"].text));
   assert.equal((await ask(root, "nonsense", deps)).ok, false);
+});
+
+test("withTier: the line ending comes from the first line; an empty frontmatter takes the tier", () => {
+  assert.equal(withTier("---\nname: V\n---\n# V\r\nbody\r\n", "on-call"), "---\nname: V\ntier: on-call\n---\n# V\r\nbody\r\n");
+  assert.equal(withTier("---\n---\n# V\n", "standing"), "---\ntier: standing\n---\n# V\n");
+});
+
+test("setMode changes only the pockets setup placed; a pocket the user already had keeps its tier", () => {
+  const root = house(["Verro", "Jarvis"]);
+  const rec = JSON.parse(fs.readFileSync(path.join(root, "house.json"), "utf8"));
+  fs.writeFileSync(path.join(root, "house.json"), JSON.stringify({ ...rec, placedCitizens: ["Jarvis"] }));
+  assert.deepEqual(setMode(root, "always-on").changed, ["Jarvis"]);
+  assert.match(fs.readFileSync(path.join(root, "Pockets", "Verro", "AGENTS.md"), "utf8"), /^tier: on-call$/m);
+});
+
+test("setMode in a house with no record says so, and changes nothing", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "nohouse-"));
+  const r = setMode(root, "always-on");
+  assert.equal(r.ok, false); assert.deepEqual(r.changed, []);
+});
+
+test("Ask about this: a topic that is a name on every object is still refused", async () => {
+  const root = house(["Verro"]);
+  const deps = { records: () => [], send: async () => {}, open: async () => "x" };
+  for (const t of ["constructor", "toString", "__proto__"]) assert.equal((await ask(root, t, deps)).ok, false, t);
 });

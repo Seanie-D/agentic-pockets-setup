@@ -261,12 +261,36 @@ test("on demand by default: every placed citizen's contract says tier on-call, a
   assert.equal(JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8")).mode, "on-demand");
 });
 
-test("always on, when the user picks it: tier standing, and a pocket already here keeps its own tier", async () => {
+test("always on, when the user picks it: tier standing, and a pocket the user had before setup keeps its own tier", async () => {
   const w = world();
-  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
+  fs.mkdirSync(path.join(w.root, "Pockets", "Verro"), { recursive: true });
+  fs.writeFileSync(path.join(w.root, "Pockets", "Verro", "AGENTS.md"), "---\ntier: on-call\n---\n# Verro, the user's own");
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro", "Vision"], accounts, root: w.root, home: w.home, mode: "always-on" }, w.deps);
   assert.equal(r.ok, true, r.message);
   assert.equal(tierIn(w.root, "Vision"), "standing");
-  assert.equal(tierIn(w.root, "Verro"), "on-call", "already here: the user's, untouched");
+  assert.equal(tierIn(w.root, "Verro"), "on-call", "the user's own, untouched");
   assert.equal(JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8")).mode, "always-on");
+});
+
+test("the house record lists the pockets setup placed, and a second run that picks always on moves them all, not the user's own", async () => {
+  const w = world();
+  fs.mkdirSync(path.join(w.root, "Pockets", "Vision"), { recursive: true });
+  fs.writeFileSync(path.join(w.root, "Pockets", "Vision", "AGENTS.md"), "---\ntier: on-call\n---\n# Vision, the user's own");
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro", "Vision"], accounts, root: w.root, home: w.home }, w.deps);
+  let rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.deepEqual(rec.placedCitizens, ["Jarvis", "Verro"]);
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro", "Ultron"], accounts, root: w.root, home: w.home, mode: "always-on" }, w.deps);
+  rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.deepEqual(rec.placedCitizens, ["Jarvis", "Ultron", "Verro"]);
+  for (const n of ["Jarvis", "Ultron", "Verro"]) assert.equal(tierIn(w.root, n), "standing", n);
+  assert.equal(tierIn(w.root, "Vision"), "on-call", "the user's own pocket");
+  assert.equal(rec.mode, "always-on");
+});
+
+test("a run with no mode keeps the house's mode", async () => {
+  const w = world();
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home, mode: "always-on" }, w.deps);
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro", "Vision"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8")).mode, "always-on");
+  assert.equal(tierIn(w.root, "Vision"), "standing");
 });

@@ -18,11 +18,12 @@ export const MODES: Record<Mode, { label: string; text: string; warning?: string
 };
 
 // A contract with its frontmatter `tier:` set: the line replaced, or added at the end of the frontmatter, or a frontmatter
-// added when the file has none. The file's own line endings are kept.
+// added when the file has none. The line ending of the file's first line is kept.
 export function withTier(md: string, tier: "on-call" | "standing"): string {
-  const nl = md.includes("\r\n") ? "\r\n" : "\n";
-  const fm = /^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/.exec(md);
+  const nl = /^[^\n]*\r\n/.test(md) ? "\r\n" : "\n";
+  const fm = /^---\r?\n(?:([\s\S]*?)\r?\n)?---(\r?\n|$)/.exec(md);
   if (!fm) return `---${nl}tier: ${tier}${nl}---${nl}${md}`;
-  const body = /^tier:.*$/m.test(fm[1]) ? fm[1].replace(/^tier:.*$/m, `tier: ${tier}`) : `${fm[1]}${nl}tier: ${tier}`;
+  const inner = fm[1] ?? "";
+  const body = /^tier:.*$/m.test(inner) ? inner.replace(/^tier:.*$/m, `tier: ${tier}`) : inner ? `${inner}${nl}tier: ${tier}` : `tier: ${tier}`;
   return `---${nl}${body}${nl}---${fm[2]}${md.slice(fm[0].length)}`;
 }

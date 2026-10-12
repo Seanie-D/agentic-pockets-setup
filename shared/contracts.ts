@@ -41,6 +41,6 @@ export const finishRpc = defineRpc({ name: "setup.finish", input: z.object({}), 
 export const profileStatusRpc = defineRpc({ name: "setup.profile.status", input: z.object({}), output: z.object({ signedIn: z.boolean() }) });
 export const profileSignInRpc = defineRpc({ name: "setup.profile.signin", input: z.object({}), output: z.object({ started: z.boolean(), message: z.string() }) });
 // How the citizens run, changed after setup (ticket 004 Q11), and "Ask about this" on a setup choice: the lead's desk.
-export const modeSetRpc = defineRpc({ name: "setup.mode.set", input: z.object({ mode: z.enum(["on-demand", "always-on"]) }), output: z.object({ ok: z.boolean(), changed: z.array(z.string()) }) });
+export const modeSetRpc = defineRpc({ name: "setup.mode.set", input: z.object({ mode: z.enum(["on-demand", "always-on"]) }), output: z.object({ ok: z.boolean(), changed: z.array(z.string()), message: z.string().optional() }) });
 export const askRpc = defineRpc({ name: "setup.ask", input: z.object({ topic: z.string() }),
   output: z.object({ ok: z.boolean(), agentId: z.string().optional(), citizen: z.string().optional(), message: z.string() }) });

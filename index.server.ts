@@ -45,7 +45,7 @@ export default function contribute(server: PluginServerContext) {
   server.handle(connectRpc, async ({ code }, { paseo }) => connect({ code, root: ROOT, home: os.homedir() }, deps(paseo)));
   server.handle(profileStatusRpc, async () => ({ signedIn: signedIn(exec, os.homedir()) }));
   server.handle(profileSignInRpc, async () => startSignIn(profileDir(os.homedir())));
-  server.handle(modeSetRpc, async ({ mode }) => ({ ok: true, ...setMode(ROOT, mode) }));
+  server.handle(modeSetRpc, async ({ mode }) => setMode(ROOT, mode));
   server.handle(askRpc, async ({ topic }, { paseo }) => ask(ROOT, topic, discussDeps(paseo)));
   server.handle(installRpc, async ({ userName, citizens, accounts, extrasOff, cleanProfile, mode }, { paseo }) => {
     // The clean profile needs its sign-in first: a signed-out folder would greet the user with "Not logged in".

@@ -54,7 +54,8 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const [pick, setPick] = useState<Pick>(emptyPick());
   const [accounts, setAccounts] = useState<Record<string, string>>({});
   const [extrasOff, setExtrasOff] = useState<string[]>([]);
-  const [mode, setMode] = useState<Mode>(DEFAULT_MODE);
+  // The form starts from the house's own mode (a screen reopened before Finish), until the user picks.
+  const [modePick, setMode] = useState<Mode | null>(null);
   const doMode = useMutation({ mutationFn: useRpc(modeSetRpc), onSuccess: () => st.refetch() });
   // The clean profile (ticket 004): offered only when the user has Claude hooks of their own; default no.
   const [cleanProfile, setCleanProfile] = useState(false);
@@ -75,6 +76,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const d = st.data;
   if (!d) return <View style={s.screen}><View style={s.body}><Text style={s.muted}>{st.isError ? `Setup could not read this computer: ${String(st.error)}` : "Looking at this computer…"}</Text></View></View>;
   const v = view(pick);
+  const mode: Mode = modePick ?? d.mode ?? DEFAULT_MODE;
   const offered = d.packs.filter((p) => (PACKS as readonly string[]).includes(p.name));
   const ultronPack = d.packs.find((p) => p.name === "Ultron");
   const accountOf = (n: string) => accounts[n] ?? d.accounts[0] ?? "claude";
@@ -197,12 +199,14 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         <Text style={s.p}>{label(doInstall.data?.firstDesk?.citizen ?? "")} has said hello in their workspace. Open it from the sidebar on the left.</Text>
         <Text style={s.h2}>How your citizens run</Text>
         <ModeChoice s={s} mode={d.mode} onPick={(m) => doMode.mutate({ mode: m })} busy={doMode.isPending} askable navigation={navigation} />
+        {doMode.data && !doMode.data.ok && <Text style={s.bad}>{doMode.data.message}</Text>}
         <Pressable accessibilityRole="button" style={s.button} onPress={() => doFinish.mutate({})}><Text style={s.buttonText}>Finish setup</Text></Pressable>
       </>}
       {d.setupDone && <Text style={s.good}>Setup is finished. Your citizens live in the sidebar. Go to them through their workspace any time.</Text>}
       {d.setupDone && <>
         <Text style={s.h2}>How your citizens run</Text>
         <ModeChoice s={s} mode={d.mode} onPick={(m) => doMode.mutate({ mode: m })} busy={doMode.isPending} askable navigation={navigation} />
+        {doMode.data && !doMode.data.ok && <Text style={s.bad}>{doMode.data.message}</Text>}
       </>}
       {d.setupDone && <TutorialView s={s} theme={theme} compact={layout.compact} navigation={navigation} />}
     </View></ScrollView>
