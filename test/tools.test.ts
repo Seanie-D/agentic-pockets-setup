@@ -143,3 +143,66 @@ test("Paseo is never installed by the plugin it hosts, and no command asks for a
     assert.equal(r[3].action, "not done"); assert.match(r[3].message ?? "", /paseo\.sh/);
   }
 });
+
+// The extras switch (ticket 004 Q8, settled (b)): each user-wide extra can be switched off for the new house only.
+// Nothing in ~/.claude or ~/.paseo changes; the house's own pockets carry the switch.
+import { applyExtrasOff } from "../server/tools.ts";
+
+const homeWith = () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-"));
+  const w = (f: string, body = "x") => { fs.mkdirSync(path.dirname(path.join(home, f)), { recursive: true }); fs.writeFileSync(path.join(home, f), body); };
+  w(".claude/settings.json", JSON.stringify({ enabledPlugins: { "caveman@caveman": true, "old@shop": false },
+    hooks: { UserPromptSubmit: [{ hooks: [{ type: "command", command: "/usr/local/bin/notify-me --loud" }] }] } }));
+  w(".claude/plugins/installed_plugins.json", "{}"); w(".claude/plugins/cache/x/y.json"); w(".claude/plugins/marketplaces/caveman/z");
+  w(".claude/skills/startday/SKILL.md"); w(".claude/agents/cairn.md", "---\nname: Cairn the Builder\ndescription: d\n---\nbody");
+  w(".claude/commands/eod.md"); w(".claude/CLAUDE.md", "Always talk like a pirate.");
+  w(".claude.json", JSON.stringify({ mcpServers: { todoist: { command: "npx" } } }));
+  w(".paseo/config.json", JSON.stringify({ daemon: { appendSystemPrompt: "Be brief." }, plugins: { gruvbox: { enabled: true }, off: { enabled: false } } }));
+  return home;
+};
+
+test("the extras list names what really reaches the house, and says which can be switched off for it alone", () => {
+  const home = homeWith();
+  const got = listExtras(home).map((e) => `${e.kind}:${e.name}:${e.switchable ? "switch" : "fixed"}`).sort();
+  assert.deepEqual(got, [
+    "agent:Cairn the Builder:switch", "command:eod:switch", "hook:UserPromptSubmit notify-me:fixed", "instructions:~/.claude/CLAUDE.md:switch",
+    "mcp:todoist:switch", "paseo:gruvbox:fixed", "paseo:system prompt for every agent:fixed", "plugin:caveman@caveman:switch", "skill:startday:switch"]);
+});
+
+test("switching extras off writes only the house's own pockets, merged with what they hold, and leaves the user's files alone", () => {
+  const home = homeWith(); const root = fs.mkdtempSync(path.join(os.tmpdir(), "house-"));
+  for (const p of ["Verro", "Ultron", "_Template"]) fs.mkdirSync(path.join(root, "Pockets", p), { recursive: true });
+  fs.mkdirSync(path.join(root, "Pockets", "Verro", ".claude"));
+  fs.writeFileSync(path.join(root, "Pockets", "Verro", ".claude", "settings.local.json"), JSON.stringify({ permissions: { deny: ["Bash(rm -rf *)"] }, theme: "dark" }));
+  const userFiles = [".claude/settings.json", ".claude.json", ".paseo/config.json", ".claude/CLAUDE.md"].map((f) => fs.readFileSync(path.join(home, f), "utf8"));
+  const extras = listExtras(home);
+  const off = extras.filter((e) => e.kind !== "skill").map((e) => e.id);
+  const r = applyExtrasOff(root, extras, off);
+
+  const verro = JSON.parse(fs.readFileSync(path.join(root, "Pockets", "Verro", ".claude", "settings.local.json"), "utf8"));
+  assert.equal(verro.theme, "dark");
+  assert.deepEqual(verro.permissions.deny.sort(), ["Agent(Cairn the Builder)", "Bash(rm -rf *)", "mcp__todoist"]);
+  assert.deepEqual(verro.skillOverrides, { eod: "off" });
+  assert.deepEqual(verro.enabledPlugins, { "caveman@caveman": false });
+  assert.deepEqual(verro.claudeMdExcludes, [path.join(home, ".claude", "CLAUDE.md")]);
+  for (const p of ["Ultron", "_Template"]) assert.ok(fs.existsSync(path.join(root, "Pockets", p, ".claude", "settings.local.json")));
+  assert.deepEqual(r.fixed.map((e) => e.kind).sort(), ["hook", "paseo", "paseo"]);
+  assert.deepEqual([".claude/settings.json", ".claude.json", ".paseo/config.json", ".claude/CLAUDE.md"].map((f) => fs.readFileSync(path.join(home, f), "utf8")), userFiles);
+
+  // Run twice (a pocket added later): nothing doubles.
+  applyExtrasOff(root, extras, off);
+  const again = JSON.parse(fs.readFileSync(path.join(root, "Pockets", "Verro", ".claude", "settings.local.json"), "utf8"));
+  assert.equal(again.permissions.deny.length, 3);
+});
+
+test("extras are named as a person would know them: a hook by its script, only real skills, not the house's own plugins", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-"));
+  const w = (f: string, body = "x") => { fs.mkdirSync(path.dirname(path.join(home, f)), { recursive: true }); fs.writeFileSync(path.join(home, f), body); };
+  w(".claude/settings.json", JSON.stringify({ hooks: { SessionStart: [{ hooks: [
+    { type: "command", command: "node /home/u/.claude/hooks/caveman-activate.js" },
+    { type: "command", command: "node \"${CLAUDE_PLUGIN_ROOT}/hooks/cache-heal.mjs\"" }] }] } }));
+  w(".claude/skills/eod/SKILL.md"); w(".claude/skills/synced/notes.txt");
+  w(".paseo/config.json", JSON.stringify({ plugins: { "agentic-pockets": { enabled: true }, "agentic-pockets-setup": { enabled: true }, gruvbox: { enabled: true } } }));
+  assert.deepEqual(listExtras(home).map((e) => e.id).sort(),
+    ["hook:SessionStart cache-heal.mjs", "hook:SessionStart caveman-activate.js", "paseo:gruvbox", "skill:eod"]);
+});

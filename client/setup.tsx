@@ -49,6 +49,7 @@ export function SetupScreen({ theme, layout }: PluginScreenProps) {
   const [userName, setUserName] = useState("");
   const [pick, setPick] = useState<Pick>(emptyPick());
   const [accounts, setAccounts] = useState<Record<string, string>>({});
+  const [extrasOff, setExtrasOff] = useState<string[]>([]);
 
   const d = st.data;
   if (!d) return <View style={s.screen}><View style={s.body}><Text style={s.muted}>{st.isError ? `Setup could not read this computer: ${String(st.error)}` : "Looking at this computer…"}</Text></View></View>;
@@ -126,12 +127,24 @@ export function SetupScreen({ theme, layout }: PluginScreenProps) {
 
         {d.extras.length > 0 && <>
           <Text style={s.h2}>5. Extras already on this computer</Text>
-          <Text style={s.muted}>These Claude Code extras reach every project on this computer, including your new house. They stay exactly as they are. If one gets in the way, ask your citizen about it.</Text>
-          {d.extras.map((e) => <Text key={`${e.kind}:${e.name}`} style={s.muted}>• {e.kind}: {e.name}</Text>)}
+          <Text style={s.muted}>These extras reach every project on this computer, your new house too. Keep them, or switch one off for your house only. Nothing is deleted, and your other projects keep them.</Text>
+          {d.extras.map((e) => {
+            const off = extrasOff.includes(e.id);
+            return (
+              <View key={e.id} style={s.row}>
+                <Text style={s.p}>{e.kind}: {e.name}</Text>
+                {e.switchable ? (
+                  <Pressable accessibilityRole="switch" accessibilityState={{ checked: !off }} style={[s.quiet, off && s.picked]} onPress={() => setExtrasOff(off ? extrasOff.filter((x) => x !== e.id) : [...extrasOff, e.id])}>
+                    <Text style={s.quietText}>{off ? "Off for my house" : "Keep"}</Text>
+                  </Pressable>
+                ) : <Text style={s.muted}>{e.kind === "paseo" ? "Set in Paseo for every project" : "Cannot be switched off for one project"}</Text>}
+              </View>
+            );
+          })}
         </>}
 
         <Pressable accessibilityRole="button" style={[s.button, (!v.citizens.length || !userName.trim() || doInstall.isPending) && s.locked]} disabled={!v.citizens.length || !userName.trim() || doInstall.isPending}
-          onPress={() => doInstall.mutate({ userName: userName.trim(), citizens: v.citizens, accounts: Object.fromEntries(v.citizens.map((n) => [n, accountOf(n)])) })}>
+          onPress={() => doInstall.mutate({ userName: userName.trim(), citizens: v.citizens, accounts: Object.fromEntries(v.citizens.map((n) => [n, accountOf(n)])), extrasOff })}>
           <Text style={s.buttonText}>{doInstall.isPending ? "Setting up…" : v.citizens.length ? `Start with ${v.citizens.map(label).join(", ")}` : "Pick someone to start with"}</Text>
         </Pressable>
         {doInstall.data && !doInstall.data.ok && <Text style={s.bad}>{doInstall.data.message}</Text>}
