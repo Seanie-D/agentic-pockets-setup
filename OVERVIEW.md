@@ -6,7 +6,7 @@ The Agentic Pockets are a small team of AI citizens that live in Paseo, each in 
 
 1. Checks the tools a house needs (Node, Git, Claude Code and Paseo) and says plainly what is ready, too old or missing. One button installs what is missing and updates what is too old: with Homebrew on a Mac, with winget on Windows. Tools that are new enough stay as they are.
 2. Takes the code from your invite page. It makes a key for this house, and the invite service gives that key read-only access to the house's files. The code works once.
-3. Asks who you would like to start with. One citizen is the simplest start; picking two or more brings the Orchestrator, who coordinates them.
+3. Asks who you would like to start with. One citizen is the simplest start; picking two or more brings the Orchestrator, who coordinates them. It also asks how your citizens run: on demand (the default: a chat opens when it is needed) or always on (each keeps a chat open all day). You can change this after setup, and ask your first citizen about it.
 4. Places your house in an `agentic-pockets` folder in your home folder, makes a Paseo workspace for each citizen, and opens the first one.
 
 ## What it reads and changes

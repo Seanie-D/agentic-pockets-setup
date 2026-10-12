@@ -4,6 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { leadOf, readTutorial } from "./tutorial.ts";
+import { MODES, type Mode } from "../shared/mode.ts";
 
 export interface AgentRecord { id: string; cwd?: string; labels?: Record<string, string>; archivedAt?: string | null }
 export interface DeskRow { provider: string; model: string; workspaceId: string }
@@ -23,19 +24,37 @@ export function discussLine(item: { id: string; title: string; body: string }): 
   return `[TUTORIAL] The user pressed "Discuss this page" on the tutorial item "${item.title}": ${item.body} Explain it to them in plain words, in your own way, and answer what they ask. Once they have it, tick it: \`node core/tools/okf.mjs tick ${item.id}\`.`;
 }
 
-export async function discuss(root: string, itemId: string, deps: DiscussDeps): Promise<{ ok: boolean; agentId?: string; citizen?: string; message: string }> {
-  const item = readTutorial(root).items.find((i) => i.id === itemId);
-  if (!item) return { ok: false, message: `"${itemId}" is not on this house's tutorial checklist.` };
+// The lead's desk gets the line; no desk: one is opened with it first, from the lead's row in house.json.
+async function toLead(root: string, line: string, what: string, deps: DiscussDeps): Promise<{ ok: boolean; agentId?: string; citizen?: string; message: string }> {
   const lead = leadOf(root);
   if (!lead) return { ok: false, message: "This house has no citizen to talk to yet. Finish setup first." };
-  const line = discussLine(item);
   const desk = deskOf(root, lead, deps.records());
   if (desk) {
     await deps.send(desk, line);
-    return { ok: true, agentId: desk, citizen: lead, message: `${lead} has the page "${item.title}".` };
+    return { ok: true, agentId: desk, citizen: lead, message: `${lead} has ${what}.` };
   }
   let row: DeskRow | undefined; try { row = JSON.parse(fs.readFileSync(path.join(root, "house.json"), "utf8")).desks?.[lead]; } catch { /* no record */ }
   if (!row?.workspaceId) return { ok: false, message: `${lead} has no desk row in the house record, so no desk can be opened.` };
   const agentId = await deps.open(row, lead, line);
-  return { ok: true, agentId, citizen: lead, message: `${lead} has the page "${item.title}".` };
+  return { ok: true, agentId, citizen: lead, message: `${lead} has ${what}.` };
+}
+
+export async function discuss(root: string, itemId: string, deps: DiscussDeps): Promise<{ ok: boolean; agentId?: string; citizen?: string; message: string }> {
+  const item = readTutorial(root).items.find((i) => i.id === itemId);
+  if (!item) return { ok: false, message: `"${itemId}" is not on this house's tutorial checklist.` };
+  return toLead(root, discussLine(item), `the page "${item.title}"`, deps);
+}
+
+// "Ask about this" on a setup choice (ticket 004 Q11: on every selection, once the first citizen is up). The topic is a
+// key, never the screen's text, so only the words below reach the citizen.
+const TOPICS: Record<string, { title: string; body: () => string }> = {
+  mode: { title: "How your citizens run", body: () => (Object.keys(MODES) as Mode[]).map((m) => `${MODES[m].label}: ${MODES[m].text}`).join(" ") },
+};
+export function askLine(topic: string): string {
+  const t = TOPICS[topic];
+  return `[SETUP] The user pressed "Ask about this" on "${t.title}" in Agentic Pockets Setup. The choices: ${t.body()} Explain it to them in plain words, in your own way, help them pick, and answer what they ask.`;
+}
+export async function ask(root: string, topic: string, deps: DiscussDeps): Promise<{ ok: boolean; agentId?: string; citizen?: string; message: string }> {
+  if (!TOPICS[topic]) return { ok: false, message: `"${topic}" is not a setup choice.` };
+  return toLead(root, askLine(topic), `your question about "${TOPICS[topic].title}"`, deps);
 }

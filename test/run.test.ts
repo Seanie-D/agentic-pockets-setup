@@ -137,7 +137,7 @@ test("Jarvis comes with every house: his pocket, workspace and desk row on the f
   const w = world();
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "codex" }, root: w.root, home: w.home }, w.deps);
   assert.equal(r.ok, true, r.message);
-  assert.equal(fs.readFileSync(path.join(w.root, "Pockets", "Jarvis", "AGENTS.md"), "utf8"), "# Jarvis");
+  assert.equal(fs.readFileSync(path.join(w.root, "Pockets", "Jarvis", "AGENTS.md"), "utf8"), "---\ntier: on-call\n---\n# Jarvis", "his pack, with the house's tier");
   const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
   assert.deepEqual(rec.citizens, ["Jarvis", "Verro"]);
   assert.deepEqual(rec.desks.Jarvis, { provider: "codex", model: rec.desks.Verro.model, workspaceId: "wks_Jarvis" });
@@ -248,4 +248,25 @@ test("with the welcome off, no row is added; it is on by default since the owner
   const on = world();
   await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: on.root, home: on.home }, on.deps);
   assert.deepEqual(on.log.filter((l) => l.startsWith("welcome")), ["welcome agent-1 Verro"]);
+});
+
+// How the citizens run (ticket 004 Q11): "On-demand is the default; always-on is a choice." The choice is each placed
+// citizen's contract tier (the one source the house plugin and the boot read), and the house record keeps it.
+const tierIn = (root: string, n: string) => /^tier: (\S+)$/m.exec(fs.readFileSync(path.join(root, "Pockets", n, "AGENTS.md"), "utf8"))?.[1];
+test("on demand by default: every placed citizen's contract says tier on-call, and the house record says on-demand", async () => {
+  const w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Ultron", "Verro", "Vision"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  for (const n of ["Ultron", "Verro", "Vision", "Jarvis"]) assert.equal(tierIn(w.root, n), "on-call", n);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8")).mode, "on-demand");
+});
+
+test("always on, when the user picks it: tier standing, and a pocket already here keeps its own tier", async () => {
+  const w = world();
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro", "Vision"], accounts, root: w.root, home: w.home, mode: "always-on" }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.equal(tierIn(w.root, "Vision"), "standing");
+  assert.equal(tierIn(w.root, "Verro"), "on-call", "already here: the user's, untouched");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8")).mode, "always-on");
 });

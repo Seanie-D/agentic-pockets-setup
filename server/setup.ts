@@ -7,6 +7,7 @@ import { PROFILE_PROVIDER, profileDir } from "./profile.ts";
 import { DESK_WELCOME_ON } from "../shared/desk-welcome.ts";
 import { season } from "./seasonings.ts";
 import { applyExtrasOff, type Extra } from "./tools.ts";
+import { DEFAULT_MODE, tierFor, withTier, type Mode } from "../shared/mode.ts";
 
 export interface Exec { (cmd: string, args: string[], o?: { env?: Record<string, string>; cwd?: string }): { status: number | null; stdout: string; stderr: string } }
 export interface Ops {
@@ -18,7 +19,7 @@ export interface Ops {
   openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
 }
 export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; doorman: string; now: () => string }
-export interface SetupInput { code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean; welcome?: boolean }
+export interface SetupInput { code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean; welcome?: boolean; mode?: Mode }
 export interface SetupResult { ok: boolean; message: string; steps: string[]; firstDesk?: { citizen: string; agentId: string | null } }
 
 // The first line of the first desk (ticket 004 Q11): setup is not finished, so the citizen says hello, sends the user
@@ -85,6 +86,24 @@ export async function connect(input: Pick<SetupInput, "code" | "root" | "home">,
   return { ok: true, message: "Connected.", steps };
 }
 
+function setTier(pocket: string, mode: Mode): boolean {
+  const f = path.join(pocket, "AGENTS.md");
+  let md: string; try { md = fs.readFileSync(f, "utf8"); } catch { return false; }
+  const out = withTier(md, tierFor(mode));
+  if (out === md) return false;
+  fs.writeFileSync(f, out);
+  return true;
+}
+
+// The same choice after setup: every citizen in the house record takes it, and the record keeps it.
+export function setMode(root: string, mode: Mode): { changed: string[] } {
+  const recFile = path.join(root, "house.json");
+  const rec = JSON.parse(fs.readFileSync(recFile, "utf8"));
+  const changed = ((rec.citizens as string[]) ?? []).filter((n) => setTier(path.join(root, "Pockets", n), mode)).sort();
+  fs.writeFileSync(recFile, JSON.stringify({ ...rec, mode, updatedAt: new Date().toISOString() }, null, 2) + "\n");
+  return { changed };
+}
+
 function fillName(dir: string, name: string) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const f = path.join(dir, e.name);
@@ -109,13 +128,20 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
 
   // 4. The house itself: the Commons, the template, and each picked citizen. A pocket already here is the user's, untouched.
   // A newly placed folder gets the user's own name in its {{USER_NAME}} slots (the tenets, Q6); a folder already here is not touched.
-  const put = (rel: string) => { const to = path.join(input.root, rel); if (!fs.existsSync(to)) { fs.cpSync(path.join(upstream, rel), to, { recursive: true, verbatimSymlinks: true }); fillName(to, name); } };
+  const placedNow: string[] = [];
+  const put = (rel: string) => { const to = path.join(input.root, rel); if (!fs.existsSync(to)) { fs.cpSync(path.join(upstream, rel), to, { recursive: true, verbatimSymlinks: true }); fillName(to, name); placedNow.push(to); } };
   for (const rel of ["Commons", path.join("Pockets", "_Template")]) if (fs.existsSync(path.join(upstream, rel))) put(rel);
   for (const n of input.citizens) {
     if (!fs.existsSync(path.join(upstream, "Pockets", n))) return fail(`${n} is not in this release of the house.`);
     put(path.join("Pockets", n));
   }
   steps.push(`Placed ${input.citizens.join(", ")} in ${input.root}.`);
+  // How the citizens run (Q11): on demand unless the user picked always on. Only a newly placed pocket takes it.
+  const mode = input.mode ?? DEFAULT_MODE;
+  for (const n of input.citizens) {
+    const dir = path.join(input.root, "Pockets", n);
+    if (placedNow.includes(dir)) setTier(dir, mode);
+  }
 
   // Ticket 004 Q2: the house plugin travels with setup. It holds the house's machinery (the Mailman, the nightly clock-out,
   // the save point) and its views, so it is placed in the house and added to Paseo before any desk opens. A folder already
@@ -183,6 +209,6 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   const recFile = path.join(input.root, "house.json");
   let rec: Record<string, unknown> = {}; try { rec = JSON.parse(fs.readFileSync(recFile, "utf8")); } catch { /* first run */ }
   const citizens = [...new Set([...((rec.citizens as string[]) ?? []), ...input.citizens])].sort();
-  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off, extrasSettings: extrasSettingsOut } : {}), seasonSettings: sz.settings, desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
+  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off, extrasSettings: extrasSettingsOut } : {}), seasonSettings: sz.settings, desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, mode, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
   return { ok: true, message: `${first} is ready. Finish setup here, then say hello.`, steps, firstDesk: { citizen: first, agentId: desk.agentId } };
 }
