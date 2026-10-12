@@ -38,6 +38,7 @@ function world(opts: { claim?: number } = {}) {
       setIcon: async (projectId, png) => { log.push(`icon ${projectId} ${fs.readFileSync(png, "utf8")}`); },
       addPlugin: async (id, dir) => { log.push(`plugin ${id} ${dir}`); return { running: true }; },
       addProvider: async (id, configDir) => { log.push(`provider ${id} ${configDir}`); },
+      welcome: async (agentId, citizen) => { log.push(`welcome ${agentId} ${citizen}`); },
       openDesk: async (o) => { log.push(`desk ${o.title} ${o.provider}/${o.model} ${JSON.stringify(o.labels)} cwd=${o.cwd}`); return { agentId: "agent-1" }; },
     },
     hostname: () => "Nicks-MacBook", doorman: "https://doorman.example", now: () => "2026-10-14T13:00:00.000Z",
@@ -228,4 +229,20 @@ test("without the clean profile nothing changes: no provider is added", async ()
   await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Ultron"], accounts: { Ultron: "claude" }, root: w.root, home: w.home }, w.deps);
   assert.ok(!w.log.some((l) => l.startsWith("provider")));
   assert.match(w.log.find((l) => l.startsWith("desk"))!, /^desk Ultron — desk claude\//);
+});
+
+// The welcome in the first desk chat (the owner via Ultron, 2026-10-12 21:31Z): a row the plugin puts at the top of the
+// first desk's chat, once, right after the desk opens. Off until the owner has read its text.
+test("with the welcome on, the first desk's chat gets one welcome row naming its citizen, right after it opens", async () => {
+  const w = world();
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Ultron", "Verro"], accounts, root: w.root, home: w.home, welcome: true }, w.deps);
+  const rows = w.log.filter((l) => l.startsWith("welcome"));
+  assert.deepEqual(rows, ["welcome agent-1 Ultron"]);
+  assert.equal(w.log.indexOf(rows[0]), w.log.findIndex((l) => l.startsWith("desk")) + 1);
+});
+
+test("with the welcome off (the default until the owner reads it), no row is added", async () => {
+  const w = world();
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
+  assert.ok(!w.log.some((l) => l.startsWith("welcome")));
 });

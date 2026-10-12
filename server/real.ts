@@ -9,6 +9,7 @@ import path from "node:path";
 import type { Deps, Exec, Ops } from "./setup";
 import type { AgentRecord, DiscussDeps } from "./discuss";
 import type { RewardDeps } from "./reward";
+import { WELCOME_KIND } from "../shared/desk-welcome";
 
 export const DOORMAN = "https://pockets-doorman.sank-junior-purple.workers.dev";
 
@@ -52,6 +53,10 @@ export function ops(paseo: PaseoApi): Ops {
       return { workspaceId: w.id, projectId: w.projectId };
     },
     setIcon: setProjectIcon,
+    // The welcome: a plugin-owned row in the first desk's chat, drawn by the client's desk-welcome renderer.
+    async welcome(agentId, citizen) {
+      await paseo.agents.ref(agentId).timeline.append({ type: "plugin", id: "desk-welcome", kind: WELCOME_KIND, version: 1, data: { citizen } });
+    },
     // The clean profile: a provider that is Claude with the house's own folder (as Paseo's own docs build a second account).
     async addProvider(id, configDir) {
       const { config } = await paseo.config.get();

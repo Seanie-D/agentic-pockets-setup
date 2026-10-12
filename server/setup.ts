@@ -4,6 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { PROFILE_PROVIDER, profileDir } from "./profile.ts";
+import { DESK_WELCOME_ON } from "../shared/desk-welcome.ts";
 import { season } from "./seasonings.ts";
 import { applyExtrasOff, type Extra } from "./tools.ts";
 
@@ -13,10 +14,11 @@ export interface Ops {
   setIcon(projectId: string, pngPath: string): Promise<void>;
   addPlugin(id: string, dir: string): Promise<{ running: boolean }>;
   addProvider(id: string, configDir: string): Promise<void>;
+  welcome(agentId: string, citizen: string): Promise<void>;
   openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
 }
 export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; doorman: string; now: () => string }
-export interface SetupInput { code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean }
+export interface SetupInput { code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean; welcome?: boolean }
 export interface SetupResult { ok: boolean; message: string; steps: string[]; firstDesk?: { citizen: string; agentId: string | null } }
 
 // The first line of the first desk (ticket 004 Q11): setup is not finished, so the citizen says hello, sends the user
@@ -174,6 +176,8 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   const desk = await deps.ops.openDesk({ workspaceId: spaces[first], cwd: path.join(input.root, "Pockets", first), provider, model: desks[first].model,
     title: `${first} — desk`, labels: { role: "desk" }, firstLine: SETUP_LINE });
   steps.push(`Opened ${first}'s desk.`);
+  // The welcome row at the top of the first desk's chat; a chat works without it, so a failure is only skipped.
+  if ((input.welcome ?? DESK_WELCOME_ON) && desk.agentId) await deps.ops.welcome(desk.agentId, first).catch(() => {});
 
   // The house record (ticket 004 Q4): what this house has, read by every citizen and by the plugin's screens.
   const recFile = path.join(input.root, "house.json");

@@ -8,6 +8,8 @@ import { tutorialReadRpc, welcomeReadRpc } from "./shared/contracts";
 import { takeOver } from "./shared/welcome";
 import { REWARD_KIND, rewardRowSchema } from "./shared/reward";
 import { DrawingView } from "./client/drawing";
+import { WELCOME_KIND, welcomeBody, welcomeRowSchema, welcomeTitle } from "./shared/desk-welcome";
+import { Text, View } from "react-native";
 
 // No install hook opens a screen, so this item takes the screen over when it first renders (ticket 009): once, while
 // this computer has not seen the welcome. The app's globalThis survives a plugin reload, so a reload does not reopen it.
@@ -33,5 +35,13 @@ export default function contribute(client: PluginClientContext) {
   // The tutorial's reward in the lead citizen's chat (ticket 009): its drawing, put there by the daemon half.
   client.addTimelineRenderer({ kind: REWARD_KIND, version: 1, schema: rewardRowSchema,
     Component: ({ item, theme, layout }) => <DrawingView drawing={item.data} theme={theme} width={layout.compact ? 300 : 320} /> });
+  // The welcome at the top of the first desk's chat (shown only when setup put it there; see shared/desk-welcome.ts).
+  client.addTimelineRenderer({ kind: WELCOME_KIND, version: 1, schema: welcomeRowSchema,
+    Component: ({ item, theme }) => (
+      <View style={{ gap: 6, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.accent, backgroundColor: theme.colors.surface1 }}>
+        <Text style={{ color: theme.colors.foreground, fontSize: 16, fontWeight: "600" }}>{welcomeTitle}</Text>
+        <Text style={{ color: theme.colors.foreground, fontSize: 15, lineHeight: 22 }}>{welcomeBody(item.data.citizen)}</Text>
+      </View>
+    ) });
   return () => {};
 }
