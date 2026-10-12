@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, Text, View } from "react-native";
 import { tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc } from "../shared/contracts";
 import { DrawingView } from "./drawing";
+import { Help, useAsk } from "./help";
 
 type S = Record<"h1" | "h2" | "p" | "muted" | "good" | "quiet" | "quietText", object>;
 type Bubble = { from: "you" | "citizen"; text: string };
@@ -45,6 +46,7 @@ export function TutorialView({ s, theme, compact, navigation }: { s: S; theme: P
   type Discussed = { ok: boolean; agentId?: string; citizen?: string; message: string };
   const discussRpc = useRpc(tutorialDiscussRpc) as (i: { itemId: string }) => Promise<Discussed>;
   const discuss = useMutation({ mutationFn: discussRpc, onSuccess: (r: Discussed) => { if (r.ok && r.agentId) navigation?.openAgent({ agentId: r.agentId }); } });
+  const help = useAsk(navigation);   // after 100 %, "Ask <lead> about this" asks without a tick (client/help.tsx)
   const markSeen = useRpc(tutorialSeenRpc);
   const [cur, setCur] = useState<string | null>(null);
   // Whether each page was new when this screen first showed it: the server's list, as it was before this visit.
@@ -69,7 +71,7 @@ export function TutorialView({ s, theme, compact, navigation }: { s: S; theme: P
       <Text style={s.muted}>{t.complete
         ? "Everything is explained. Re-read any page, or ask about it again."
         : `${done} of ${items.length} explained. Ask any citizen about an item; it is ticked when they explain it.`}</Text>
-      <Text style={s.p}>Any time your brain glazes over and what you read does not make sense, type /wait-what in any chat.</Text>
+      {!t.complete && <Text style={s.p}>Any time your brain glazes over and what you read does not make sense, type /wait-what in any chat.</Text>}
       {t.reward && (t.reward.drawing
         ? <DrawingView drawing={t.reward.drawing} theme={theme} width={compact ? 300 : 320} />
         : <Text style={s.p}>{NAMES[t.reward.citizen] ?? t.reward.citizen} is making something for you.</Text>)}
@@ -88,10 +90,12 @@ export function TutorialView({ s, theme, compact, navigation }: { s: S; theme: P
           {page.lines?.map((l, k) => <Text key={k} style={s.p}>•  {l.text}</Text>)}
           {page.example && <Example key={page.id} example={page.example} animate={fresh[page.id] === true} theme={theme} />}
           {page.done && <Text style={s.muted}>Explained by {NAMES[page.done.by] ?? page.done.by}</Text>}
-          {lead && <Pressable accessibilityRole="button" style={[s.quiet, { alignSelf: "flex-start" }]} disabled={discuss.isPending} onPress={() => discuss.mutate({ itemId: page.id })}><Text style={s.quietText}>{ask}</Text></Pressable>}
-          {discuss.data && <Text style={discuss.data.ok ? s.good : s.muted}>{discuss.data.message}</Text>}
+          {lead && <Pressable accessibilityRole="button" style={[s.quiet, { alignSelf: "flex-start" }]} disabled={discuss.isPending || help.isPending} onPress={() => t.complete ? help.mutate({ kind: "page", id: page.id }) : discuss.mutate({ itemId: page.id })}><Text style={s.quietText}>{ask}</Text></Pressable>}
+          {discuss.data && !t.complete && <Text style={discuss.data.ok ? s.good : s.muted}>{discuss.data.message}</Text>}
+          {help.data && t.complete && <Text style={help.data.ok ? s.good : s.muted}>{help.data.message}</Text>}
         </View>
       </View>
+      {t.complete && <Help s={s} theme={theme} lead={lead} navigation={navigation} />}
     </View>
   );
 }

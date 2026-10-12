@@ -11,6 +11,8 @@ import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialDis
 import { markWelcomeSeen, welcomeSeen } from "./server/welcome";
 import { markSeen, readTutorial, realProbe, stateTicks } from "./server/tutorial";
 import { rewardPass } from "./server/reward";
+import { askHelp, readGlossary } from "./server/help";
+import { helpAskRpc, helpGlossaryRpc } from "./shared/contracts";
 
 // The house goes in the user's home folder, beside anything they already have (ticket 004 Q7: earlier projects untouched).
 const ROOT = path.join(os.homedir(), "agentic-pockets");
@@ -56,6 +58,8 @@ export default function contribute(server: PluginServerContext) {
     const rec = record(); fs.writeFileSync(path.join(ROOT, "house.json"), JSON.stringify({ ...rec, setupDone: true, updatedAt: new Date().toISOString() }, null, 2) + "\n");
     return { ok: true };
   });
+  server.handle(helpGlossaryRpc, async () => ({ terms: readGlossary(ROOT) }));
+  server.handle(helpAskRpc, async (subject, { paseo }) => askHelp(ROOT, subject, discussDeps(paseo)));
   server.on("agent.turn_ended", (_e, { paseo }) => reward(paseo));
   return () => {};
 }

@@ -24,19 +24,22 @@ export function discussLine(item: { id: string; title: string; body: string }): 
   return `[TUTORIAL] The user pressed "Discuss this page" on the tutorial item "${item.title}": ${item.body} Explain it to them in plain words, in your own way, and answer what they ask. Once they have it, tick it: \`node core/tools/okf.mjs tick ${item.id}\`.`;
 }
 
-// The lead's desk gets the line; no desk: one is opened with it first, from the lead's row in house.json.
+// A citizen's desk gets the line; no desk: one is opened with it first, from the citizen's row in house.json. One path for
+// "Discuss this page", "Ask about this" and Help.
+export async function reach(root: string, citizen: string, line: string, deps: DiscussDeps): Promise<{ agentId: string } | { error: string }> {
+  const desk = deskOf(root, citizen, deps.records());
+  if (desk) { await deps.send(desk, line); return { agentId: desk }; }
+  let row: DeskRow | undefined; try { row = JSON.parse(fs.readFileSync(path.join(root, "house.json"), "utf8")).desks?.[citizen]; } catch { /* no record */ }
+  if (!row?.workspaceId) return { error: `${citizen} has no desk row in the house record, so no desk can be opened.` };
+  return { agentId: await deps.open(row, citizen, line) };
+}
+
 async function toLead(root: string, line: string, what: string, deps: DiscussDeps): Promise<{ ok: boolean; agentId?: string; citizen?: string; message: string }> {
   const lead = leadOf(root);
   if (!lead) return { ok: false, message: "This house has no citizen to talk to yet. Finish setup first." };
-  const desk = deskOf(root, lead, deps.records());
-  if (desk) {
-    await deps.send(desk, line);
-    return { ok: true, agentId: desk, citizen: lead, message: `${lead} has ${what}.` };
-  }
-  let row: DeskRow | undefined; try { row = JSON.parse(fs.readFileSync(path.join(root, "house.json"), "utf8")).desks?.[lead]; } catch { /* no record */ }
-  if (!row?.workspaceId) return { ok: false, message: `${lead} has no desk row in the house record, so no desk can be opened.` };
-  const agentId = await deps.open(row, lead, line);
-  return { ok: true, agentId, citizen: lead, message: `${lead} has ${what}.` };
+  const r = await reach(root, lead, line, deps);
+  if ("error" in r) return { ok: false, message: r.error };
+  return { ok: true, agentId: r.agentId, citizen: lead, message: `${lead} has ${what}.` };
 }
 
 export async function discuss(root: string, itemId: string, deps: DiscussDeps): Promise<{ ok: boolean; agentId?: string; citizen?: string; message: string }> {

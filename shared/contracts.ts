@@ -42,5 +42,10 @@ export const profileStatusRpc = defineRpc({ name: "setup.profile.status", input:
 export const profileSignInRpc = defineRpc({ name: "setup.profile.signin", input: z.object({}), output: z.object({ started: z.boolean(), message: z.string() }) });
 // How the citizens run, changed after setup (ticket 004 Q11), and "Ask about this" on a setup choice: the lead's desk.
 export const modeSetRpc = defineRpc({ name: "setup.mode.set", input: z.object({ mode: z.enum(["on-demand", "always-on"]) }), output: z.object({ ok: z.boolean(), changed: z.array(z.string()), message: z.string().optional() }) });
-export const askRpc = defineRpc({ name: "setup.ask", input: z.object({ topic: z.string() }),
+export const askRpc = defineRpc({ name: "setup.ask", input: z.object({ topic: z.enum(["mode"]) }),
+  output: z.object({ ok: z.boolean(), agentId: z.string().optional(), citizen: z.string().optional(), message: z.string() }) });
+// Agentic Pockets Help (ticket 009 Q1c): the house's glossary, and "Ask Ultron about this" on a word or a page.
+export const helpGlossaryRpc = defineRpc({ name: "setup.help.glossary", input: z.object({}),
+  output: z.object({ terms: z.array(z.object({ word: z.string(), meaning: z.string(), not: z.string().optional() })) }) });
+export const helpAskRpc = defineRpc({ name: "setup.help.ask", input: z.object({ kind: z.enum(["term", "page"]), id: z.string() }),
   output: z.object({ ok: z.boolean(), agentId: z.string().optional(), citizen: z.string().optional(), message: z.string() }) });
