@@ -11,7 +11,7 @@ import { runSetup, type Deps } from "../server/setup.ts";
 function upstream() {
   const u = fs.mkdtempSync(path.join(os.tmpdir(), "upstream-"));
   const w = (f: string, body = "x") => { fs.mkdirSync(path.dirname(path.join(u, f)), { recursive: true }); fs.writeFileSync(path.join(u, f), body); };
-  w("Commons/tenets.md", "1. One rule."); w("Pockets/_Template/core/VERSION", "0.1.22");
+  w("Commons/tenets.md", "11. **Scripts flag, {{USER_NAME}} decides.**\n"); w("Commons/skills/x/SKILL.md", "Fill {{SKIPS}} here; {{USER_NAME}} owns it.\n"); w("Pockets/_Template/core/VERSION", "0.1.22");
   for (const n of ["Ultron", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
   return u;
 }
@@ -44,7 +44,7 @@ const accounts = { Ultron: "claude", Verro: "claude", Vision: "claude" };
 
 test("a full run: key, invite, house, a workspace and face per citizen, the first desk on Ultron", async () => {
   const w = world();
-  const r = await runSetup({ code: "INVITE-CODE-123456789", citizens: ["Ultron", "Verro", "Vision"], accounts, root: w.root, home: w.home }, w.deps);
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Ultron", "Verro", "Vision"], accounts, root: w.root, home: w.home }, w.deps);
   assert.equal(r.ok, true, r.message);
   const key = path.join(w.home, ".agentic-pockets", "keys", "house_ed25519");
   assert.ok(w.log.some((l) => l.startsWith(`ssh-keygen -t ed25519`) && l.includes(key)));
@@ -64,23 +64,39 @@ test("a full run: key, invite, house, a workspace and face per citizen, the firs
 
 test("one citizen alone: its own desk is the first desk", async () => {
   const w = world();
-  const r = await runSetup({ code: "INVITE-CODE-123456789", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
   assert.equal(r.ok, true, r.message);
   assert.match(w.log.find((l) => l.startsWith("desk"))!, /^desk Verro — desk/);
 });
 
 test("a used invite stops the run before anything is downloaded, and says so plainly", async () => {
   const w = world({ claim: 409 });
-  const r = await runSetup({ code: "INVITE-CODE-123456789", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
   assert.equal(r.ok, false); assert.match(r.message, /already been used/);
   assert.ok(!w.log.some((l) => l.startsWith("git clone")) && !fs.existsSync(w.root));
 });
 
 test("an existing pocket of the user's is never overwritten on a second run", async () => {
   const w = world();
-  await runSetup({ code: "INVITE-CODE-123456789", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
   fs.writeFileSync(path.join(w.root, "Pockets", "Verro", "AGENTS.md"), "# Verro, as the user changed it");
-  await runSetup({ code: "INVITE-CODE-123456789", citizens: ["Verro", "Vision"], accounts: { Verro: "claude", Vision: "claude" }, root: w.root, home: w.home }, w.deps);
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro", "Vision"], accounts: { Verro: "claude", Vision: "claude" }, root: w.root, home: w.home }, w.deps);
   assert.equal(fs.readFileSync(path.join(w.root, "Pockets", "Verro", "AGENTS.md"), "utf8"), "# Verro, as the user changed it");
   assert.ok(fs.existsSync(path.join(w.root, "Pockets", "Vision", "AGENTS.md")));
+});
+
+test("the user's own name fills the tenets' slot when the house is placed, and is kept in the house record", async () => {
+  const w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.equal(fs.readFileSync(path.join(w.root, "Commons", "tenets.md"), "utf8"), "11. **Scripts flag, Nick decides.**\n");
+  assert.equal(fs.readFileSync(path.join(w.root, "Commons", "skills", "x", "SKILL.md"), "utf8"), "Fill {{SKIPS}} here; Nick owns it.\n", "only the name slot is filled");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8")).userName, "Nick");
+});
+
+test("no name, no run: setup asks for it before anything is placed", async () => {
+  const w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "  ", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, false); assert.match(r.message, /name/i);
+  assert.ok(!fs.existsSync(w.root));
 });

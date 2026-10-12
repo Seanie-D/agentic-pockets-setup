@@ -45,6 +45,7 @@ export function SetupScreen({ theme, layout }: PluginScreenProps) {
   const doInstall = useMutation({ mutationFn: useRpc(installRpc), onSuccess: () => st.refetch() });
   const doFinish = useMutation({ mutationFn: useRpc(finishRpc), onSuccess: () => st.refetch() });
   const [code, setCode] = useState("");
+  const [userName, setUserName] = useState("");
   const [pick, setPick] = useState<Pick>(emptyPick());
   const [accounts, setAccounts] = useState<Record<string, string>>({});
 
@@ -87,7 +88,11 @@ export function SetupScreen({ theme, layout }: PluginScreenProps) {
       )}
 
       {d.connected && !installed && <>
-        <Text style={s.h2}>3. Who would you like to start with?</Text>
+        <Text style={s.h2}>3. Your name</Text>
+        <Text style={s.muted}>Your citizens call you by this name, and the house rules use it.</Text>
+        <TextInput accessibilityLabel="Your name" style={s.input} value={userName} onChangeText={setUserName} autoCorrect={false} placeholder="Your first name" placeholderTextColor={c.foregroundMuted} />
+
+        <Text style={s.h2}>4. Who would you like to start with?</Text>
         <Text style={s.muted}>Tick one to start simple. You can add more at any time.</Text>
         {offered.map((p) => {
           const on = pick.packs.includes(p.name);
@@ -112,13 +117,13 @@ export function SetupScreen({ theme, layout }: PluginScreenProps) {
         )}
 
         {d.extras.length > 0 && <>
-          <Text style={s.h2}>4. Extras already on this computer</Text>
+          <Text style={s.h2}>5. Extras already on this computer</Text>
           <Text style={s.muted}>These Claude Code extras reach every project on this computer, including your new house. They stay exactly as they are. If one gets in the way, ask your citizen about it.</Text>
           {d.extras.map((e) => <Text key={`${e.kind}:${e.name}`} style={s.muted}>• {e.kind}: {e.name}</Text>)}
         </>}
 
-        <Pressable accessibilityRole="button" style={[s.button, (!v.citizens.length || doInstall.isPending) && s.locked]} disabled={!v.citizens.length || doInstall.isPending}
-          onPress={() => doInstall.mutate({ citizens: v.citizens, accounts: Object.fromEntries(v.citizens.map((n) => [n, accountOf(n)])) })}>
+        <Pressable accessibilityRole="button" style={[s.button, (!v.citizens.length || !userName.trim() || doInstall.isPending) && s.locked]} disabled={!v.citizens.length || !userName.trim() || doInstall.isPending}
+          onPress={() => doInstall.mutate({ userName: userName.trim(), citizens: v.citizens, accounts: Object.fromEntries(v.citizens.map((n) => [n, accountOf(n)])) })}>
           <Text style={s.buttonText}>{doInstall.isPending ? "Setting up…" : v.citizens.length ? `Start with ${v.citizens.map(label).join(", ")}` : "Pick someone to start with"}</Text>
         </Pressable>
         {doInstall.data && !doInstall.data.ok && <Text style={s.bad}>{doInstall.data.message}</Text>}

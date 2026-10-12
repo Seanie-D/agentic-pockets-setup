@@ -19,7 +19,7 @@ export default function contribute(server: PluginServerContext) {
       packs: packsIn(ROOT), accounts: accounts.length ? accounts : ["claude"], setupDone: record().setupDone === true };
   });
   server.handle(connectRpc, async ({ code }, { paseo }) => connect({ code, root: ROOT, home: os.homedir() }, deps(paseo)));
-  server.handle(installRpc, async ({ citizens, accounts }, { paseo }) => install({ code: "", citizens, accounts, root: ROOT, home: os.homedir() }, deps(paseo)));
+  server.handle(installRpc, async ({ userName, citizens, accounts }, { paseo }) => install({ code: "", userName, citizens, accounts, root: ROOT, home: os.homedir() }, deps(paseo)));
   server.handle(finishRpc, async () => {
     const rec = record(); fs.writeFileSync(path.join(ROOT, "house.json"), JSON.stringify({ ...rec, setupDone: true, updatedAt: new Date().toISOString() }, null, 2) + "\n");
     return { ok: true };

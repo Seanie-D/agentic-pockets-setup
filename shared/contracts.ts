@@ -15,7 +15,7 @@ export const status = defineRpc({
 export const connectRpc = defineRpc({ name: "setup.connect", input: z.object({ code: z.string().min(8) }), output: Result });
 export const installRpc = defineRpc({
   name: "setup.install",
-  input: z.object({ citizens: z.array(z.string()).min(1), accounts: z.record(z.string(), z.string()) }),
+  input: z.object({ userName: z.string().min(1), citizens: z.array(z.string()).min(1), accounts: z.record(z.string(), z.string()) }),
   output: Result.extend({ firstDesk: z.object({ citizen: z.string(), agentId: z.string().nullable() }).optional() }),
 });
 export const finishRpc = defineRpc({ name: "setup.finish", input: z.object({}), output: z.object({ ok: z.boolean() }) });

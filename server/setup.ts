@@ -11,7 +11,7 @@ export interface Ops {
   openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
 }
 export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; doorman: string; now: () => string }
-export interface SetupInput { code: string; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string> }
+export interface SetupInput { code: string; userName: string; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string> }
 export interface SetupResult { ok: boolean; message: string; steps: string[]; firstDesk?: { citizen: string; agentId: string | null } }
 
 // The first line of the first desk (ticket 004 Q11): setup is not finished, so the citizen says hello, sends the user
@@ -21,6 +21,7 @@ const DEFAULT_MODEL: Record<string, string> = { claude: "claude-opus-5-5" };
 
 // The whole run, as the tests drive it: connect, then install.
 export async function runSetup(input: SetupInput, deps: Deps): Promise<SetupResult> {
+  if (!input.userName?.trim()) return { ok: false, message: "Tell us your name first. Your citizens use it.", steps: [] };
   if (!input.citizens.length) return { ok: false, message: "Pick at least one citizen to start with.", steps: [] };
   const c = await connect(input, deps);
   if (!c.ok) return c;
@@ -76,15 +77,26 @@ export async function connect(input: Pick<SetupInput, "code" | "root" | "home">,
   return { ok: true, message: "Connected.", steps };
 }
 
+function fillName(dir: string, name: string) {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const f = path.join(dir, e.name);
+    if (e.isDirectory()) fillName(f, name);
+    else if (e.isFile() && /\.md$/.test(e.name)) { const t = fs.readFileSync(f, "utf8"); if (t.includes("{{USER_NAME}}")) fs.writeFileSync(f, t.replaceAll("{{USER_NAME}}", name)); }
+  }
+}
+
 // Steps 4–5: place the picked citizens, a workspace with its face for each, and the first desk.
 export async function install(input: SetupInput, deps: Deps): Promise<SetupResult> {
   const steps: string[] = [];
   const fail = (message: string): SetupResult => ({ ok: false, message, steps });
+  const name = input.userName?.trim();
+  if (!name) return fail("Tell us your name first. Your citizens use it.");
   if (!input.citizens.length) return fail("Pick at least one citizen to start with.");
   const upstream = path.join(input.root, ".upstream");
 
   // 4. The house itself: the Commons, the template, and each picked citizen. A pocket already here is the user's, untouched.
-  const put = (rel: string) => { const to = path.join(input.root, rel); if (!fs.existsSync(to)) fs.cpSync(path.join(upstream, rel), to, { recursive: true, verbatimSymlinks: true }); };
+  // A newly placed folder gets the user's own name in its {{USER_NAME}} slots (the tenets, Q6); a folder already here is not touched.
+  const put = (rel: string) => { const to = path.join(input.root, rel); if (!fs.existsSync(to)) { fs.cpSync(path.join(upstream, rel), to, { recursive: true, verbatimSymlinks: true }); fillName(to, name); } };
   for (const rel of ["Commons", path.join("Pockets", "_Template")]) if (fs.existsSync(path.join(upstream, rel))) put(rel);
   for (const n of input.citizens) {
     if (!fs.existsSync(path.join(upstream, "Pockets", n))) return fail(`${n} is not in this release of the house.`);
@@ -112,6 +124,6 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   const recFile = path.join(input.root, "house.json");
   let rec: Record<string, unknown> = {}; try { rec = JSON.parse(fs.readFileSync(recFile, "utf8")); } catch { /* first run */ }
   const citizens = [...new Set([...((rec.citizens as string[]) ?? []), ...input.citizens])].sort();
-  fs.writeFileSync(recFile, JSON.stringify({ ...rec, citizens, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
+  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, citizens, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
   return { ok: true, message: `${first} is ready. Finish setup here, then say hello.`, steps, firstDesk: { citizen: first, agentId: desk.agentId } };
 }
