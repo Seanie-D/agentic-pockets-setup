@@ -54,3 +54,10 @@ test("a house with no checklist yet shows none and is not complete", () => {
   const t = readTutorial(root);
   assert.deepEqual(t.items, []); assert.equal(t.complete, false); assert.equal(t.percent, 0);
 });
+
+test("the machinery's Jev ticks (.machinery/jev-ticks.json) count too, with the citizen whose chat Jev read", () => {
+  const h = house();
+  h.w(".machinery/jev-ticks.json", JSON.stringify({ mail: { at: "2026-10-14T08:00:00Z", by: "Verro" }, nosuch: { at: "2026-10-14T08:00:00Z", by: "Verro" } }));
+  h.w("Pockets/Ultron/tutorial/ticks.json", JSON.stringify({ mail: "2026-10-14T09:00:00Z" }));
+  assert.deepEqual(readTutorial(h.root).items.find((i) => i.id === "mail")?.done, { at: "2026-10-14T08:00:00Z", by: "Verro" });
+});

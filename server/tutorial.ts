@@ -31,6 +31,12 @@ export function readTutorial(root: string): Tutorial {
       if (typeof at === "string" && (!i.done || at < i.done.at)) i.done = { at, by };
     }
   }
+  // The machinery's Jev ticks at close (house plugin, ticket 009 Q2 with Jev): its own file, never a citizen's pocket.
+  const jev = readJson(path.join(root, ".machinery", "jev-ticks.json")) ?? {};
+  for (const i of items) {
+    const j = jev[i.id];
+    if (j && typeof j.at === "string" && typeof j.by === "string" && (!i.done || j.at < i.done.at)) i.done = { at: j.at, by: j.by };
+  }
   const done = items.filter((i) => i.done).length;
   const complete = items.length > 0 && done === items.length;
   const lead = leadOf(root);
