@@ -5,7 +5,7 @@ import { useRpc } from "@getpaseo/plugin/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { connectRpc, finishRpc, installRpc, status } from "../shared/contracts";
+import { connectRpc, finishRpc, installRpc, installToolsRpc, status } from "../shared/contracts";
 import { PACKS, emptyPick, toggle, view, type Pick } from "../shared/picker";
 import { openExternal } from "./web";
 
@@ -41,6 +41,7 @@ export function SetupScreen({ theme, layout }: PluginScreenProps) {
 
   const readStatus = useRpc(status);
   const st = useQuery({ queryKey: ["setup.status"], queryFn: () => readStatus({}) });
+  const doTools = useMutation({ mutationFn: useRpc(installToolsRpc), onSuccess: () => st.refetch() });
   const doConnect = useMutation({ mutationFn: useRpc(connectRpc), onSuccess: () => st.refetch() });
   const doInstall = useMutation({ mutationFn: useRpc(installRpc), onSuccess: () => st.refetch() });
   const doFinish = useMutation({ mutationFn: useRpc(finishRpc), onSuccess: () => st.refetch() });
@@ -69,10 +70,17 @@ export function SetupScreen({ theme, layout }: PluginScreenProps) {
           <Text style={t.state === "ok" ? s.good : s.bad}>{t.state === "ok" ? "Ready" : t.state === "old" ? "Too old" : "Missing"}</Text>
           <Text style={s.p}>{t.name}{t.have ? ` ${t.have}` : ""}</Text>
           <Text style={s.muted}>{t.state === "ok" ? t.why : `needs ${t.need} or newer: ${t.why}`}</Text>
-          {t.state !== "ok" && <Pressable accessibilityRole="link" style={s.quiet} onPress={() => openExternal(HELP[t.name] ?? "https://paseo.sh")}><Text style={s.quietText}>How to get it</Text></Pressable>}
+          {t.state !== "ok" && doTools.data && <Pressable accessibilityRole="link" style={s.quiet} onPress={() => openExternal(HELP[t.name] ?? "https://paseo.sh")}><Text style={s.quietText}>How to get it</Text></Pressable>}
         </View>
       ))}
-      {!toolsOk && <Pressable accessibilityRole="button" style={s.quiet} onPress={() => st.refetch()}><Text style={s.quietText}>Check again</Text></Pressable>}
+      {doTools.data?.tools.filter((t) => t.message).map((t) => <Text key={`m-${t.name}`} style={s.bad}>{t.name}: {t.message}</Text>)}
+      {!toolsOk && <View style={s.row}>
+        <Pressable accessibilityRole="button" style={[s.button, doTools.isPending && s.locked]} disabled={doTools.isPending} onPress={() => doTools.mutate({})}>
+          <Text style={s.buttonText}>{doTools.isPending ? "Installing… this can take a few minutes" : "Install or update"}</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" style={s.quiet} onPress={() => st.refetch()}><Text style={s.quietText}>Check again</Text></Pressable>
+      </View>}
+      {!toolsOk && !doTools.data && <Text style={s.muted}>Tools you already have stay as they are. An old one is updated, a missing one is installed. Your other projects are not touched.</Text>}
 
       <Text style={s.h2}>2. Your invite</Text>
       {d.connected ? <Text style={s.good}>Your house is connected.</Text> : (

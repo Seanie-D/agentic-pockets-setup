@@ -3,9 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { connect, install, packsIn } from "./server/setup";
-import { checkTools, listExtras } from "./server/tools";
+import { checkTools, installTools, listExtras } from "./server/tools";
 import { deps, exec } from "./server/real";
-import { connectRpc, finishRpc, installRpc, status } from "./shared/contracts";
+import { connectRpc, finishRpc, installRpc, installToolsRpc, status } from "./shared/contracts";
 
 // The house goes in the user's home folder, beside anything they already have (ticket 004 Q7: earlier projects untouched).
 const ROOT = path.join(os.homedir(), "agentic-pockets");
@@ -18,6 +18,7 @@ export default function contribute(server: PluginServerContext) {
     return { tools: checkTools(exec), extras: listExtras(os.homedir()), root: ROOT, connected: fs.existsSync(path.join(ROOT, ".upstream")),
       packs: packsIn(ROOT), accounts: accounts.length ? accounts : ["claude"], setupDone: record().setupDone === true };
   });
+  server.handle(installToolsRpc, async () => ({ tools: installTools(exec, process.platform) }));
   server.handle(connectRpc, async ({ code }, { paseo }) => connect({ code, root: ROOT, home: os.homedir() }, deps(paseo)));
   server.handle(installRpc, async ({ userName, citizens, accounts }, { paseo }) => install({ code: "", userName, citizens, accounts, root: ROOT, home: os.homedir() }, deps(paseo)));
   server.handle(finishRpc, async () => {

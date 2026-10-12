@@ -1,5 +1,5 @@
-// The tool check and the user-wide extras list (ticket 004 Q2, Q7, Q8). Both only read: the check asks each tool for
-// its version, and the list reads ~/.claude. Installing or switching anything off is a separate, asked-for step.
+// The tool check, the install, and the user-wide extras (ticket 004 Q2, Q7, Q8). The check and the list only read.
+// installTools runs only when the user asks: kept if new enough, updated if old, installed if missing.
 import fs from "node:fs";
 import path from "node:path";
 
@@ -16,10 +16,47 @@ const ver = (s: string) => (s.match(/(\d+)\.(\d+)\.(\d+)/) || [])[0] ?? null;
 const older = (a: string, b: string) => { const x = a.split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i]; return false; };
 
 export function checkTools(run: Run): Tool[] {
+  return NEED.map((t) => checkOne(run, t));
+}
+function checkOne(run: Run, t: (typeof NEED)[number]): Tool {
+  const r = run(t.name, t.args);
+  const have = r.status === 0 ? ver(r.stdout) : null;
+  return { name: t.name, need: t.need, why: t.why, have, state: !have ? "missing" : older(have, t.need) ? "old" : "ok" };
+}
+
+// Where each tool comes from: Homebrew on a Mac, winget on Windows (Ultron's brief, 2026-10-12). Names checked that day
+// against formulae.brew.sh and microsoft/winget-pkgs. Paseo is not here: this plugin runs inside Paseo, which already
+// requires 0.11.2, and an app cannot safely replace itself while it runs.
+const BREW: Record<string, string[]> = { node: ["node"], git: ["git"], claude: ["--cask", "claude-code"] };
+const WINGET: Record<string, string> = { node: "OpenJS.NodeJS.LTS", git: "Git.Git", claude: "Anthropic.ClaudeCode" };
+const QUIET = ["--silent", "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"];
+
+export interface Installed extends Tool { action: "kept" | "installed" | "updated" | "not done"; message?: string }
+
+export function installTools(run: Run, platform: NodeJS.Platform): Installed[] {
+  const brew = platform === "darwin" && run("brew", ["--version"]).status === 0;
+  const winget = platform === "win32" && run("winget", ["--version"]).status === 0;
   return NEED.map((t) => {
-    const r = run(t.name, t.args);
-    const have = r.status === 0 ? ver(r.stdout) : null;
-    return { name: t.name, need: t.need, why: t.why, have, state: !have ? "missing" : older(have, t.need) ? "old" : "ok" };
+    const before = checkOne(run, t);
+    if (before.state === "ok") return { ...before, action: "kept" };
+    if (t.name === "paseo") return { ...before, action: "not done", message: "Update Paseo from its own menu, or from paseo.sh." };
+    const pkg = BREW[t.name];
+    if (platform === "darwin") {
+      if (!brew) return { ...before, action: "not done", message: "Homebrew comes first: it installs the other tools. Get it from brew.sh (it asks for your Mac password once), then press Install again." };
+      const managed = before.state === "old" && run("brew", ["list", "--versions", ...pkg]).status === 0;
+      run("brew", [managed ? "upgrade" : "install", ...pkg]);
+    } else if (platform === "win32") {
+      if (!winget) return { ...before, action: "not done", message: "winget comes first: it installs the other tools. Get App Installer from the Microsoft Store, then press Install again." };
+      const id = ["--id", WINGET[t.name], "--exact"];
+      const managed = before.state === "old" && run("winget", ["list", ...id, "--accept-source-agreements"]).status === 0;
+      // This user only, so no admin prompt; a tool with no per-user installer falls back to the whole computer,
+      // which may show Windows' own "allow changes" prompt for the user to click.
+      if (managed) run("winget", ["upgrade", ...id, ...QUIET]);
+      else if (run("winget", ["install", ...id, "--scope", "user", ...QUIET]).status !== 0) run("winget", ["install", ...id, ...QUIET]);
+    } else return { ...before, action: "not done", message: `Install ${t.name} ${t.need} or newer with your system's package manager.` };
+    const after = checkOne(run, t);
+    const action = after.state !== "ok" ? "not done" : before.state === "missing" ? "installed" : "updated";
+    return { ...after, action, ...(after.state !== "ok" ? { message: `${t.name} is still ${after.state === "old" ? "too old" : "missing"} after the install.` } : {}) };
   });
 }
 

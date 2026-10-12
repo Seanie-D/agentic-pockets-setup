@@ -8,8 +8,12 @@ import type { Deps, Exec, Ops } from "./setup";
 export const DOORMAN = "https://pockets-doorman.sank-junior-purple.workers.dev";
 
 // Tools live in odd places on a new machine: Homebrew, the Paseo app's own CLI, Claude Code's installer folder.
-const EXTRA_PATH = ["/opt/homebrew/bin", "/usr/local/bin", `${os.homedir()}/.local/bin`, `${os.homedir()}/.claude/local`,
-  "/Applications/Paseo.app/Contents/Resources/bin"];
+const EXTRA_PATH = process.platform === "win32"
+  // winget changes PATH for new windows only, so a tool installed a moment ago is found here (Node, Git, winget's links, Claude).
+  ? [`${process.env.ProgramFiles ?? "C:\\Program Files"}\\nodejs`, `${process.env.ProgramFiles ?? "C:\\Program Files"}\\Git\\cmd`,
+    `${process.env.LOCALAPPDATA ?? ""}\\Programs\\Git\\cmd`, `${process.env.LOCALAPPDATA ?? ""}\\Microsoft\\WinGet\\Links`, `${os.homedir()}\\.local\\bin`]
+  : ["/opt/homebrew/bin", "/usr/local/bin", `${os.homedir()}/.local/bin`, `${os.homedir()}/.claude/local`,
+    "/Applications/Paseo.app/Contents/Resources/bin"];
 export const pathEnv = () => [process.env.PATH ?? "", ...EXTRA_PATH].filter(Boolean).join(process.platform === "win32" ? ";" : ":");
 
 export const exec: Exec = (cmd, args, o) => {
