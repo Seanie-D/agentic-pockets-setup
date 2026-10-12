@@ -241,8 +241,11 @@ test("with the welcome on, the first desk's chat gets one welcome row naming its
   assert.equal(w.log.indexOf(rows[0]), w.log.findIndex((l) => l.startsWith("desk")) + 1);
 });
 
-test("with the welcome off (the default until the owner reads it), no row is added", async () => {
+test("with the welcome off, no row is added; it is on by default since the owner approved its text", async () => {
   const w = world();
-  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home, welcome: false }, w.deps);
   assert.ok(!w.log.some((l) => l.startsWith("welcome")));
+  const on = world();
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: on.root, home: on.home }, on.deps);
+  assert.deepEqual(on.log.filter((l) => l.startsWith("welcome")), ["welcome agent-1 Verro"]);
 });

@@ -1,8 +1,8 @@
 // The welcome in the user's first desk chat (the owner's ask, 2026-10-12, via Ultron): a row the setup plugin puts at the
-// top of that chat, once, right after the first desk opens. The text is Ultron's draft; off until the owner has read it.
+// top of that chat, once, right after the first desk opens. The text is Ultron's draft, approved by the owner (2026-10-12).
 import { z } from "zod";
 
-export const DESK_WELCOME_ON = false;
+export const DESK_WELCOME_ON = true;
 export const WELCOME_KIND = "desk-welcome";
 export const welcomeRowSchema = z.object({ citizen: z.string() });
 const NAMES: Record<string, string> = { MissMinutes: "Miss Minutes" };
