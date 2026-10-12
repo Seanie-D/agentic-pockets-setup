@@ -13,6 +13,12 @@ export interface DiscussDeps {
   open(row: DeskRow, citizen: string, firstLine: string): Promise<string>;
 }
 
+// A citizen's live desk: labelled role=desk, not archived, in its own pocket.
+export function deskOf(root: string, citizen: string, records: AgentRecord[]): string | null {
+  const pocket = path.resolve(root, "Pockets", citizen);
+  return records.find((r) => r.labels?.role === "desk" && !r.archivedAt && r.cwd && path.resolve(r.cwd) === pocket)?.id ?? null;
+}
+
 export function discussLine(item: { id: string; title: string; body: string }): string {
   return `[TUTORIAL] The user pressed "Discuss this page" on the tutorial item "${item.title}": ${item.body} Explain it to them in plain words, in your own way, and answer what they ask. Once they have it, tick it: \`node core/tools/okf.mjs tick ${item.id}\`.`;
 }
@@ -23,11 +29,10 @@ export async function discuss(root: string, itemId: string, deps: DiscussDeps): 
   const lead = leadOf(root);
   if (!lead) return { ok: false, message: "This house has no citizen to talk to yet. Finish setup first." };
   const line = discussLine(item);
-  const pocket = path.resolve(root, "Pockets", lead);
-  const desk = deps.records().find((r) => r.labels?.role === "desk" && !r.archivedAt && r.cwd && path.resolve(r.cwd) === pocket);
+  const desk = deskOf(root, lead, deps.records());
   if (desk) {
-    await deps.send(desk.id, line);
-    return { ok: true, agentId: desk.id, citizen: lead, message: `${lead} has the page "${item.title}".` };
+    await deps.send(desk, line);
+    return { ok: true, agentId: desk, citizen: lead, message: `${lead} has the page "${item.title}".` };
   }
   let row: DeskRow | undefined; try { row = JSON.parse(fs.readFileSync(path.join(root, "house.json"), "utf8")).desks?.[lead]; } catch { /* no record */ }
   if (!row?.workspaceId) return { ok: false, message: `${lead} has no desk row in the house record, so no desk can be opened.` };

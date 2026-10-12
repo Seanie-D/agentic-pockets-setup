@@ -6,6 +6,8 @@ import { useEffect } from "react";
 import { SetupScreen } from "./client/setup";
 import { tutorialReadRpc, welcomeReadRpc } from "./shared/contracts";
 import { takeOver } from "./shared/welcome";
+import { REWARD_KIND, rewardRowSchema } from "./shared/reward";
+import { DrawingView } from "./client/drawing";
 
 // No install hook opens a screen, so this item takes the screen over when it first renders (ticket 009): once, while
 // this computer has not seen the welcome. The app's globalThis survives a plugin reload, so a reload does not reopen it.
@@ -28,5 +30,8 @@ function SetupItem({ currentScreen, openScreen }: PluginSidebarItemProps) {
 export default function contribute(client: PluginClientContext) {
   client.addScreen({ id: "setup", title: "Agentic Pockets Setup", Component: SetupScreen });
   client.addSidebarHeaderItem({ id: "setup", title: "Agentic Pockets Setup", Component: SetupItem });
+  // The tutorial's reward in the lead citizen's chat (ticket 009): its drawing, put there by the daemon half.
+  client.addTimelineRenderer({ kind: REWARD_KIND, version: 1, schema: rewardRowSchema,
+    Component: ({ item, theme, layout }) => <DrawingView drawing={item.data} theme={theme} width={layout.compact ? 300 : 320} /> });
   return () => {};
 }

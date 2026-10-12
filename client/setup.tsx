@@ -168,7 +168,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         <Pressable accessibilityRole="button" style={s.button} onPress={() => doFinish.mutate({})}><Text style={s.buttonText}>Finish setup</Text></Pressable>
       </>}
       {d.setupDone && <Text style={s.good}>Setup is finished. Your citizens live in the sidebar. Go to them through their workspace any time.</Text>}
-      {d.setupDone && <TutorialView s={s} navigation={navigation} />}
+      {d.setupDone && <TutorialView s={s} theme={theme} compact={layout.compact} navigation={navigation} />}
     </View></ScrollView>
   );
 }

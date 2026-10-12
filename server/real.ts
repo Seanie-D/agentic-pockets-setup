@@ -8,6 +8,7 @@ type PaseoApi = PluginHandlerContext["paseo"];
 import path from "node:path";
 import type { Deps, Exec, Ops } from "./setup";
 import type { AgentRecord, DiscussDeps } from "./discuss";
+import type { RewardDeps } from "./reward";
 
 export const DOORMAN = "https://pockets-doorman.sank-junior-purple.workers.dev";
 
@@ -78,6 +79,11 @@ export function discussDeps(paseo: PaseoApi): DiscussDeps {
       return a.id;
     },
   };
+}
+
+// The reward's chat row: a plugin-owned row in the lead citizen's timeline, drawn by the client's tutorial-reward renderer.
+export function rewardDeps(paseo: PaseoApi): RewardDeps {
+  return { ...discussDeps(paseo), async append(agentId, item) { await paseo.agents.ref(agentId).timeline.append(item as Parameters<ReturnType<PaseoApi["agents"]["ref"]>["timeline"]["append"]>[0]); } };
 }
 
 export function deps(paseo: PaseoApi): Deps {
