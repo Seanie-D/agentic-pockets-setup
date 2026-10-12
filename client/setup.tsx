@@ -5,7 +5,8 @@ import { useRpc } from "@getpaseo/plugin/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { connectRpc, finishRpc, installRpc, installToolsRpc, status } from "../shared/contracts";
+import { connectRpc, finishRpc, installRpc, installToolsRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
+import { LeftAlone, Welcome } from "./welcome";
 import { PACKS, emptyPick, toggle, view, type Pick } from "../shared/picker";
 import { openExternal } from "./web";
 
@@ -50,6 +51,14 @@ export function SetupScreen({ theme, layout }: PluginScreenProps) {
   const [pick, setPick] = useState<Pick>(emptyPick());
   const [accounts, setAccounts] = useState<Record<string, string>>({});
   const [extrasOff, setExtrasOff] = useState<string[]>([]);
+
+  // The welcome comes first on a computer that has not seen it (ticket 009); either button marks it seen for good.
+  const readWelcome = useRpc(welcomeReadRpc);
+  const welcome = useQuery({ queryKey: ["setup.welcome.read"], queryFn: () => readWelcome({}) });
+  const dismiss = useMutation({ mutationFn: useRpc(welcomeDismissRpc), onSuccess: () => welcome.refetch() });
+  const [left, setLeft] = useState(false);
+  if (left) return <LeftAlone s={s} />;
+  if (welcome.data?.seen === false) return <Welcome s={s} onGo={() => dismiss.mutate({})} onLeave={() => { setLeft(true); dismiss.mutate({}); }} />;
 
   const d = st.data;
   if (!d) return <View style={s.screen}><View style={s.body}><Text style={s.muted}>{st.isError ? `Setup could not read this computer: ${String(st.error)}` : "Looking at this computer…"}</Text></View></View>;

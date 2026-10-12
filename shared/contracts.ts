@@ -22,4 +22,7 @@ export const installRpc = defineRpc({
     extrasOff: z.array(z.string()).default([]) }),
   output: Result.extend({ firstDesk: z.object({ citizen: z.string(), agentId: z.string().nullable() }).optional() }),
 });
+// The welcome take-over (ticket 009): whether this computer has seen it, and marking it seen.
+export const welcomeReadRpc = defineRpc({ name: "setup.welcome.read", input: z.object({}), output: z.object({ seen: z.boolean() }) });
+export const welcomeDismissRpc = defineRpc({ name: "setup.welcome.dismiss", input: z.object({}), output: z.object({ seen: z.boolean() }) });
 export const finishRpc = defineRpc({ name: "setup.finish", input: z.object({}), output: z.object({ ok: z.boolean() }) });
