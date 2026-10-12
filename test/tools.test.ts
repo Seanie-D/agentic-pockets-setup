@@ -21,6 +21,14 @@ test("a machine with everything new enough: all ok", () => {
   assert.deepEqual(checkTools(run).map((t) => [t.name, t.state]), [["node", "ok"], ["git", "ok"], ["claude", "ok"], ["paseo", "ok"]]);
 });
 
+// Friday's Windows walk, 2026-10-12 21:21Z: the app's own command is not on PATH (Program Files\Paseo\resources\bin on
+// Windows, the app bundle on a Mac, /opt/Paseo on Linux), and the check called Paseo "Missing" while this plugin ran in it.
+test("Paseo with no command on PATH is not missing: this plugin runs inside it, and Paseo enforces its 0.11.2 minimum", () => {
+  const { run } = fakeRun({ node: "v24.16.0\n", git: "git version 2.43.0\n", claude: "2.1.270 (Claude Code)\n" });
+  const p = checkTools(run).find((t) => t.name === "paseo")!;
+  assert.equal(p.state, "ok"); assert.equal(p.have, "running");
+});
+
 test("old and missing tools are named, with what is needed", () => {
   const { run } = fakeRun({ node: "v18.19.0\n", paseo: "0.10.4\n" });
   const r = checkTools(run);
@@ -165,7 +173,7 @@ test("Paseo is never installed by the plugin it hosts, and no command asks for a
     const r = installTools(m.run, os);
     assert.ok(!m.calls.some((c) => /paseo/i.test(c) && / (install|upgrade) /.test(c)));
     assert.ok(!m.calls.some((c) => /^sudo |runas|-Verb RunAs/.test(c)));
-    assert.equal(r[3].action, "not done"); assert.match(r[3].message ?? "", /paseo\.sh/);
+    assert.equal(r[3].action, "kept", "Paseo is running this plugin, so it is kept, never installed");
   }
 });
 

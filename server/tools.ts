@@ -21,6 +21,9 @@ export function checkTools(run: Run): Tool[] {
 function checkOne(run: Run, t: (typeof NEED)[number]): Tool {
   const r = run(t.name, t.args);
   const have = r.status === 0 ? ver(r.stdout) : null;
+  // This plugin runs inside Paseo, and Paseo refuses to run it below the manifest's minimum (0.11.2): with no command
+  // found, Paseo is still here (Friday's Windows walk, 2026-10-12: the app's command is not on PATH).
+  if (t.name === "paseo" && !have) return { name: t.name, need: t.need, why: t.why, have: "running", state: "ok" };
   return { name: t.name, need: t.need, why: t.why, have, state: !have ? "missing" : older(have, t.need) ? "old" : "ok" };
 }
 

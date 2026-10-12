@@ -16,9 +16,11 @@ export const DOORMAN = "https://pockets-doorman.sank-junior-purple.workers.dev";
 const EXTRA_PATH = process.platform === "win32"
   // winget changes PATH for new windows only, so a tool installed a moment ago is found here (Node, Git, winget's links, Claude).
   ? [`${process.env.ProgramFiles ?? "C:\\Program Files"}\\nodejs`, `${process.env.ProgramFiles ?? "C:\\Program Files"}\\Git\\cmd`,
-    `${process.env.LOCALAPPDATA ?? ""}\\Programs\\Git\\cmd`, `${process.env.LOCALAPPDATA ?? ""}\\Microsoft\\WinGet\\Links`, `${os.homedir()}\\.local\\bin`]
+    `${process.env.LOCALAPPDATA ?? ""}\\Programs\\Git\\cmd`, `${process.env.LOCALAPPDATA ?? ""}\\Microsoft\\WinGet\\Links`, `${os.homedir()}\\.local\\bin`,
+    // Paseo's own command, inside the app (machine-wide or per user); not on PATH (Friday's Windows walk, 2026-10-12).
+    `${process.env.ProgramFiles ?? "C:\\Program Files"}\\Paseo\\resources\\bin`, `${process.env.LOCALAPPDATA ?? ""}\\Programs\\Paseo\\resources\\bin`]
   : ["/opt/homebrew/bin", "/usr/local/bin", `${os.homedir()}/.local/bin`, `${os.homedir()}/.claude/local`,
-    "/Applications/Paseo.app/Contents/Resources/bin"];
+    "/Applications/Paseo.app/Contents/Resources/bin", "/opt/Paseo/resources/bin"];
 export const pathEnv = () => [process.env.PATH ?? "", ...EXTRA_PATH].filter(Boolean).join(process.platform === "win32" ? ";" : ":");
 
 export const exec: Exec = (cmd, args, o) => {
