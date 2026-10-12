@@ -5,7 +5,9 @@ import os from "node:os";
 // The SDK names the Paseo handle in its handler context, so no outside package is needed in a clean install.
 import type { PluginHandlerContext } from "@getpaseo/plugin/server";
 type PaseoApi = PluginHandlerContext["paseo"];
+import path from "node:path";
 import type { Deps, Exec, Ops } from "./setup";
+import type { AgentRecord, DiscussDeps } from "./discuss";
 
 export const DOORMAN = "https://pockets-doorman.sank-junior-purple.workers.dev";
 
@@ -52,6 +54,28 @@ export function ops(paseo: PaseoApi): Ops {
       if (!w) throw new Error("the workspace was not made in this run");
       const a = await w.agents.create({ config: { provider: `${o.provider}/${o.model}`, modeId: "auto" }, title: o.title, labels: o.labels, prompt: o.firstLine });
       return { agentId: a.id };
+    },
+  };
+}
+
+// "Discuss this page": the desks Paseo knows, read from its own agent records (PASEO_HOME, else ~/.paseo), and the
+// lead citizen's desk reached or opened through the SDK.
+export function discussDeps(paseo: PaseoApi): DiscussDeps {
+  return {
+    records() {
+      const dir = path.join(process.env.PASEO_HOME || path.join(os.homedir(), ".paseo"), "agents");
+      const out: AgentRecord[] = [];
+      let groups: string[] = []; try { groups = fs.readdirSync(dir); } catch { return out; }
+      for (const g of groups) {
+        let files: string[] = []; try { files = fs.readdirSync(path.join(dir, g)).filter((f) => f.endsWith(".json")); } catch { continue; }
+        for (const f of files) try { out.push(JSON.parse(fs.readFileSync(path.join(dir, g, f), "utf8"))); } catch { /* half-written */ }
+      }
+      return out;
+    },
+    async send(agentId, text) { await paseo.agents.ref(agentId).send(text); },
+    async open(row, citizen, firstLine) {
+      const a = await paseo.workspaces.ref(row.workspaceId).agents.create({ config: { provider: `${row.provider}/${row.model}`, modeId: "auto" }, title: `${citizen} — desk`, labels: { role: "desk" }, prompt: firstLine });
+      return a.id;
     },
   };
 }

@@ -28,6 +28,8 @@ export const welcomeDismissRpc = defineRpc({ name: "setup.welcome.dismiss", inpu
 // The tutorial (ticket 009): the house's checklist with each item's tick, the percent, the sidebar label, the reward.
 export const tutorialReadRpc = defineRpc({ name: "setup.tutorial.read", input: z.object({}), output: z.object({
   items: z.array(z.object({ id: z.string(), title: z.string(), body: z.string(), done: z.object({ at: z.string(), by: z.string() }).nullable() })),
-  percent: z.number(), complete: z.boolean(), label: z.string(),
+  lead: z.string().nullable(), percent: z.number(), complete: z.boolean(), label: z.string(),
   reward: z.object({ citizen: z.string(), image: z.string().nullable(), line: z.string().nullable() }).nullable() }) });
+export const tutorialDiscussRpc = defineRpc({ name: "setup.tutorial.discuss", input: z.object({ itemId: z.string() }),
+  output: z.object({ ok: z.boolean(), agentId: z.string().optional(), citizen: z.string().optional(), message: z.string() }) });
 export const finishRpc = defineRpc({ name: "setup.finish", input: z.object({}), output: z.object({ ok: z.boolean() }) });

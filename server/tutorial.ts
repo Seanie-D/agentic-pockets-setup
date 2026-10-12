@@ -8,9 +8,15 @@ export const LABEL_DURING = "Agentic Pockets Setup";   // the owner, Q1c 2026-10
 export const LABEL_AFTER = "Agentic Pockets Help";
 
 export interface Item { id: string; title: string; body: string; done: { at: string; by: string } | null }
-export interface Tutorial { items: Item[]; percent: number; complete: boolean; label: string; reward: { citizen: string; image: string | null; line: string | null } | null }
+export interface Tutorial { items: Item[]; lead: string | null; percent: number; complete: boolean; label: string; reward: { citizen: string; image: string | null; line: string | null } | null }
 
 const readJson = (f: string) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return null; } };
+
+// The citizen who leads the tutorial: Ultron when he is in the house, else the first citizen the user picked.
+export function leadOf(root: string): string | null {
+  if (fs.existsSync(path.join(root, "Pockets", "Ultron"))) return "Ultron";
+  return ((readJson(path.join(root, "house.json"))?.citizens ?? []) as string[]).find((n) => n !== "Jarvis") ?? null;
+}
 
 export function readTutorial(root: string): Tutorial {
   // A house with the JHS skills adds their own items (Commons/skills/jhs/tutorial-items.json), so JHS words stay in that folder.
@@ -27,7 +33,7 @@ export function readTutorial(root: string): Tutorial {
   }
   const done = items.filter((i) => i.done).length;
   const complete = items.length > 0 && done === items.length;
-  const lead = names.includes("Ultron") ? "Ultron" : ((readJson(path.join(root, "house.json"))?.citizens ?? []) as string[]).find((n) => n !== "Jarvis") ?? null;
+  const lead = leadOf(root);
   let reward: Tutorial["reward"] = null;
   if (complete && lead) {
     const dir = path.join(pockets, lead, "tutorial");
@@ -35,5 +41,5 @@ export function readTutorial(root: string): Tutorial {
     let line: string | null = null; try { line = fs.readFileSync(path.join(dir, "reward.md"), "utf8").trim() || null; } catch { /* still drawing */ }
     reward = { citizen: lead, image: fs.existsSync(image) ? image : null, line };
   }
-  return { items, percent: items.length ? Math.round((done / items.length) * 100) : 0, complete, label: complete ? LABEL_AFTER : LABEL_DURING, reward };
+  return { items, lead, percent: items.length ? Math.round((done / items.length) * 100) : 0, complete, label: complete ? LABEL_AFTER : LABEL_DURING, reward };
 }

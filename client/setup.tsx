@@ -19,7 +19,7 @@ const HELP: Record<string, string> = {
   claude: "https://docs.claude.com/en/docs/claude-code/setup", paseo: "https://paseo.sh",
 };
 
-export function SetupScreen({ theme, layout }: PluginScreenProps) {
+export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const c = theme.colors;
   const s = useMemo(() => ({
     screen: { flex: 1, backgroundColor: c.surface0 },
@@ -168,7 +168,7 @@ export function SetupScreen({ theme, layout }: PluginScreenProps) {
         <Pressable accessibilityRole="button" style={s.button} onPress={() => doFinish.mutate({})}><Text style={s.buttonText}>Finish setup</Text></Pressable>
       </>}
       {d.setupDone && <Text style={s.good}>Setup is finished. Your citizens live in the sidebar. Go to them through their workspace any time.</Text>}
-      {d.setupDone && <TutorialView s={s} />}
+      {d.setupDone && <TutorialView s={s} navigation={navigation} />}
     </View></ScrollView>
   );
 }
