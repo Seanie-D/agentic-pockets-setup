@@ -128,7 +128,7 @@ test("the extras the user switched off are in every new pocket before its first 
 });
 
 test("Jarvis comes with every house: his pocket, workspace and desk row on the first citizen's account, but not the first desk", async () => {
-  // Sean, 2026-10-12 13:32 CDT: Jarvis joins "At setup, always"; he does not count toward Ultron's two or more.
+  // Ticket 004 Q16, ruled 2026-10-12: Jarvis joins "At setup, always"; he does not count toward Ultron's two or more.
   const w = world();
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "codex" }, root: w.root, home: w.home }, w.deps);
   assert.equal(r.ok, true, r.message);

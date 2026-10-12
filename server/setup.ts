@@ -96,7 +96,7 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   if (!input.citizens.length) return fail("Pick at least one citizen to start with.");
   const upstream = path.join(input.root, ".upstream");
   // Jarvis comes with every house, beside the picked citizens, on the first one's account; the first desk stays theirs
-  // (Sean, 2026-10-12: "At setup, always"). He does not count toward Ultron's two or more: that is the picker's.
+  // (ticket 004 Q16, ruled 2026-10-12: "At setup, always"). He does not count toward Ultron's two or more: that is the picker's.
   const picked = input.citizens;
   if (!picked.includes(HOUSE_MANAGER) && fs.existsSync(path.join(upstream, "Pockets", HOUSE_MANAGER)))
     input = { ...input, citizens: [...picked, HOUSE_MANAGER], accounts: { [HOUSE_MANAGER]: input.accounts[picked[0]] ?? "claude", ...input.accounts } };
