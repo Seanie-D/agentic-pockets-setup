@@ -1,5 +1,5 @@
-// The welcome take-over (Sean, 2026-10-12 14:23 CDT; ticket 009): the first thing a new user sees once the plugin is
-// installed. The line rises in, then the two ways on: start setup, or Sean's exit, word for word.
+// The welcome take-over (ticket 009, asked 2026-10-12): the first thing a new user sees once the plugin is
+// installed. The line rises in, then the two ways on: start setup, or the owner's exit, word for word.
 import { useEffect, useRef } from "react";
 import { Animated, Easing, Pressable, Text, View } from "react-native";
 import { LEAVE_ME_ALONE, WELCOME_LINE } from "../shared/welcome";
