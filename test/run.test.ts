@@ -12,7 +12,7 @@ function upstream() {
   const u = fs.mkdtempSync(path.join(os.tmpdir(), "upstream-"));
   const w = (f: string, body = "x") => { fs.mkdirSync(path.dirname(path.join(u, f)), { recursive: true }); fs.writeFileSync(path.join(u, f), body); };
   w("Commons/tenets.md", "11. **Scripts flag, {{USER_NAME}} decides.**\n"); w("Commons/skills/x/SKILL.md", "Fill {{SKIPS}} here; {{USER_NAME}} owns it.\n"); w("Pockets/_Template/core/VERSION", "0.1.22");
-  for (const n of ["Ultron", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
+  for (const n of ["Ultron", "Jarvis", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
   return u;
 }
 function world(opts: { claim?: number } = {}) {
@@ -54,12 +54,12 @@ test("a full run: key, invite, house, a workspace and face per citizen, the firs
   for (const n of ["Ultron", "Verro", "Vision"]) assert.ok(fs.existsSync(path.join(w.root, "Pockets", n, "AGENTS.md")), `${n} is in the house`);
   assert.ok(!fs.existsSync(path.join(w.root, "Pockets", "Friday")), "a citizen not picked stays out");
   assert.ok(fs.existsSync(path.join(w.root, "Commons", "tenets.md")) && fs.existsSync(path.join(w.root, "Pockets", "_Template", "core", "VERSION")));
-  assert.deepEqual(w.log.filter((l) => l.startsWith("workspace")).map((l) => l.split(" ")[1]), ["Ultron", "Verro", "Vision"]);
-  assert.deepEqual(w.log.filter((l) => l.startsWith("icon")), ["icon prj_Ultron png-Ultron", "icon prj_Verro png-Verro", "icon prj_Vision png-Vision"]);
+  assert.deepEqual(w.log.filter((l) => l.startsWith("workspace")).map((l) => l.split(" ")[1]), ["Ultron", "Verro", "Vision", "Jarvis"]);
+  assert.deepEqual(w.log.filter((l) => l.startsWith("icon")), ["icon prj_Ultron png-Ultron", "icon prj_Verro png-Verro", "icon prj_Vision png-Vision", "icon prj_Jarvis png-Jarvis"]);
   const desks = w.log.filter((l) => l.startsWith("desk"));
   assert.equal(desks.length, 1); assert.match(desks[0], /^desk Ultron — desk claude\/\S+ \{"role":"desk"\} cwd=.*Pockets\/Ultron$/);
   const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
-  assert.deepEqual(rec.citizens, ["Ultron", "Verro", "Vision"]); assert.equal(rec.setupDone, false);
+  assert.deepEqual(rec.citizens, ["Jarvis", "Ultron", "Verro", "Vision"]); assert.equal(rec.setupDone, false);
 });
 
 test("one citizen alone: its own desk is the first desk", async () => {
@@ -109,6 +109,7 @@ test("the house record keeps each citizen's desk row (account, model, workspace)
   assert.deepEqual(rec.desks, {
     Ultron: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Ultron" },
     Verro: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Verro" },
+    Jarvis: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Jarvis" },
   });
 });
 
@@ -124,4 +125,17 @@ test("the extras the user switched off are in every new pocket before its first 
   const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
   assert.deepEqual(rec.extrasOff, ["skill:caveman"]);
   assert.deepEqual(rec.extrasSettings, { skillOverrides: { caveman: "off" } }, "the settings a citizen added later gets (the Citizens tab)");
+});
+
+test("Jarvis comes with every house: his pocket, workspace and desk row on the first citizen's account, but not the first desk", async () => {
+  // Sean, 2026-10-12 13:32 CDT: Jarvis joins "At setup, always"; he does not count toward Ultron's two or more.
+  const w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "codex" }, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.equal(fs.readFileSync(path.join(w.root, "Pockets", "Jarvis", "AGENTS.md"), "utf8"), "# Jarvis");
+  const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.deepEqual(rec.citizens, ["Jarvis", "Verro"]);
+  assert.deepEqual(rec.desks.Jarvis, { provider: "codex", model: rec.desks.Verro.model, workspaceId: "wks_Jarvis" });
+  assert.deepEqual(w.log.filter((l) => l.startsWith("desk")).map((l) => l.split(" — ")[0]), ["desk Verro"]);
+  assert.equal(r.firstDesk?.citizen, "Verro");
 });

@@ -124,6 +124,7 @@ export function SetupScreen({ theme, layout }: PluginScreenProps) {
             <Text style={s.muted}>{ultronPack.hello.trim() || ULTRON_LINE}</Text>
           </Pressable>
         )}
+        {d.packs.some((p) => p.name === "Jarvis") && <Text style={s.muted}>Jarvis, the house manager, comes with every house.</Text>}
 
         {d.extras.length > 0 && <>
           <Text style={s.h2}>5. Extras already on this computer</Text>

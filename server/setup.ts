@@ -19,6 +19,7 @@ export interface SetupResult { ok: boolean; message: string; steps: string[]; fi
 // back to finish, and says they can ask it anything at any time.
 export const SETUP_LINE = "[SETUP] Setup has just started and is not finished yet. Say hello in one or two plain sentences, tell the user they can ask you anything at any time, and send them back to the Agentic Pockets setup screen to finish it.";
 const DEFAULT_MODEL: Record<string, string> = { claude: "claude-opus-5-5" };
+const HOUSE_MANAGER = "Jarvis";
 
 // The whole run, as the tests drive it: connect, then install.
 export async function runSetup(input: SetupInput, deps: Deps): Promise<SetupResult> {
@@ -94,6 +95,11 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   if (!name) return fail("Tell us your name first. Your citizens use it.");
   if (!input.citizens.length) return fail("Pick at least one citizen to start with.");
   const upstream = path.join(input.root, ".upstream");
+  // Jarvis comes with every house, beside the picked citizens, on the first one's account; the first desk stays theirs
+  // (Sean, 2026-10-12: "At setup, always"). He does not count toward Ultron's two or more: that is the picker's.
+  const picked = input.citizens;
+  if (!picked.includes(HOUSE_MANAGER) && fs.existsSync(path.join(upstream, "Pockets", HOUSE_MANAGER)))
+    input = { ...input, citizens: [...picked, HOUSE_MANAGER], accounts: { [HOUSE_MANAGER]: input.accounts[picked[0]] ?? "claude", ...input.accounts } };
 
   // 4. The house itself: the Commons, the template, and each picked citizen. A pocket already here is the user's, untouched.
   // A newly placed folder gets the user's own name in its {{USER_NAME}} slots (the tenets, Q6); a folder already here is not touched.
