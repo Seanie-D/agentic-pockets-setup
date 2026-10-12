@@ -1,0 +1,9 @@
+{
+  "id": "agentic-pockets-setup",
+  "name": "Agentic Pockets setup",
+  "description": "Sets up your own Agentic Pockets house from a personal invite: checks your tools, connects your house, and opens your first citizen.",
+  "media": [],
+  "requirements": {
+    "paseo": ">=0.11.2"
+  }
+}
