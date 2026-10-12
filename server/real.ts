@@ -2,7 +2,9 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
-import type { PaseoApi } from "@getpaseo/client";
+// The SDK names the Paseo handle in its handler context, so no outside package is needed in a clean install.
+import type { PluginHandlerContext } from "@getpaseo/plugin/server";
+type PaseoApi = PluginHandlerContext["paseo"];
 import type { Deps, Exec, Ops } from "./setup";
 
 export const DOORMAN = "https://pockets-doorman.sank-junior-purple.workers.dev";

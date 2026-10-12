@@ -14,7 +14,7 @@ export const status = defineRpc({
   output: z.object({ tools: z.array(Tool), extras: z.array(Extra), root: z.string(), connected: z.boolean(),
     packs: z.array(z.object({ name: z.string(), hello: z.string() })), accounts: z.array(z.string()), setupDone: z.boolean() }),
 });
-export const installToolsRpc = defineRpc({ name: "setup.installTools", input: z.object({}), output: z.object({ tools: z.array(Installed) }) });
+export const installToolsRpc = defineRpc({ name: "setup.tools.install", input: z.object({}), output: z.object({ tools: z.array(Installed) }) });
 export const connectRpc = defineRpc({ name: "setup.connect", input: z.object({ code: z.string().min(8) }), output: Result });
 export const installRpc = defineRpc({
   name: "setup.install",
