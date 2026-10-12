@@ -19,7 +19,7 @@ export const pathEnv = () => [process.env.PATH ?? "", ...EXTRA_PATH].filter(Bool
 export const exec: Exec = (cmd, args, o) => {
   const env: NodeJS.ProcessEnv = { ...process.env, PATH: pathEnv(), ...(o?.env ?? {}) };
   delete env.PASEO_AGENT_ID; delete env.PASEO_AGENT_CWD;
-  const r = spawnSync(cmd, args, { env, encoding: "utf8", timeout: 300_000, shell: process.platform === "win32" });
+  const r = spawnSync(cmd, args, { env, cwd: o?.cwd, encoding: "utf8", timeout: 300_000, shell: process.platform === "win32" });
   return { status: r.error ? 127 : r.status, stdout: r.stdout ?? "", stderr: (r.stderr ?? "") + (r.error ? String(r.error.message) : "") };
 };
 

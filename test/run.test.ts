@@ -24,6 +24,7 @@ function world(opts: { claim?: number } = {}) {
       if (cmd === "ssh-keygen") { const f = args[args.indexOf("-f") + 1]; fs.writeFileSync(f, "PRIVATE"); fs.writeFileSync(`${f}.pub`, "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHouseKeyHouseKeyHouseKeyHouseKeyHouseKe house"); return { status: 0, stdout: "", stderr: "" }; }
       if (cmd === "git" && args[0] === "clone") { fs.cpSync(up, args[args.length - 1], { recursive: true }); return { status: 0, stdout: "", stderr: "" }; }
       if (cmd === "git") return { status: 0, stdout: "", stderr: "" };
+      if (cmd === "claude") { log[log.length - 1] += ` @${path.basename(o?.cwd ?? "?")}`; return { status: 0, stdout: "", stderr: "" }; }
       return { status: 1, stdout: "", stderr: `unexpected ${cmd}` };
     },
     fetch: async (url, init) => {
@@ -138,4 +139,40 @@ test("Jarvis comes with every house: his pocket, workspace and desk row on the f
   assert.deepEqual(rec.desks.Jarvis, { provider: "codex", model: rec.desks.Verro.model, workspaceId: "wks_Jarvis" });
   assert.deepEqual(w.log.filter((l) => l.startsWith("desk")).map((l) => l.split(" — ")[0]), ["desk Verro"]);
   assert.equal(r.firstDesk?.citizen, "Verro");
+});
+
+// The seasonings (Friday's recipe, Deliverables/2026-10-12-friday-seans-seasonings-recipe.md; ruled 2026-10-12 13:50 CDT:
+// house only): caveman at level full and context-mode, switched on for each citizen's folder, plus four settings.
+const settingsOf = (root: string, n: string) => JSON.parse(fs.readFileSync(path.join(root, "Pockets", n, ".claude", "settings.json"), "utf8"));
+
+test("seasonings: caveman and context-mode switched on in every citizen's folder, with the four settings, and kept in the house record", async () => {
+  const w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  for (const n of ["Verro", "Jarvis"]) {
+    for (const [plugin, repo] of [["caveman@caveman", "JuliusBrussee/caveman"], ["context-mode@context-mode", "mksglu/context-mode"]]) {
+      assert.ok(w.log.includes(`claude plugin marketplace add ${repo} --scope project @${n}`), `${repo} known in ${n}`);
+      assert.ok(w.log.includes(`claude plugin install ${plugin} --scope project @${n}`), `${plugin} on in ${n}`);
+    }
+    const s = settingsOf(w.root, n);
+    assert.equal(s.autoCompactEnabled, false); assert.equal(s.autoMemoryEnabled, false);
+    assert.deepEqual(s.env, { BASH_MAX_OUTPUT_LENGTH: "150000", CAVEMAN_DEFAULT_MODE: "full" });
+  }
+  const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.deepEqual(rec.seasonSettings.enabledPlugins, { "caveman@caveman": true, "context-mode@context-mode": true });
+  assert.deepEqual(rec.seasonSettings.extraKnownMarketplaces.caveman, { source: { source: "github", repo: "JuliusBrussee/caveman" } });
+  assert.equal(rec.seasonSettings.autoMemoryEnabled, false);
+});
+
+test("seasonings: one the user already has in their own Claude is left to theirs, so it never runs twice", async () => {
+  const w = world();
+  fs.mkdirSync(path.join(w.home, ".claude"), { recursive: true });
+  fs.writeFileSync(path.join(w.home, ".claude", "settings.json"), JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command: "node ~/.claude/hooks/caveman-activate.js" }] }] } }));
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.ok(!w.log.some((l) => l.includes("caveman")), "no caveman install");
+  assert.ok(w.log.includes("claude plugin install context-mode@context-mode --scope project @Verro"));
+  const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.deepEqual(rec.seasonSettings.enabledPlugins, { "context-mode@context-mode": true });
+  assert.ok(r.steps.some((s) => /Left caveman to your own Claude/.test(s)));
 });

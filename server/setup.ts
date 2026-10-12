@@ -3,9 +3,10 @@
 // inside Paseo and against fakes in the tests. Built by Jarvis, 2026-10-12.
 import fs from "node:fs";
 import path from "node:path";
+import { season } from "./seasonings.ts";
 import { applyExtrasOff, type Extra } from "./tools.ts";
 
-export interface Exec { (cmd: string, args: string[], o?: { env?: Record<string, string> }): { status: number | null; stdout: string; stderr: string } }
+export interface Exec { (cmd: string, args: string[], o?: { env?: Record<string, string>; cwd?: string }): { status: number | null; stdout: string; stderr: string } }
 export interface Ops {
   createWorkspace(o: { dir: string; title: string }): Promise<{ workspaceId: string; projectId: string | null }>;
   setIcon(projectId: string, pngPath: string): Promise<void>;
@@ -121,6 +122,13 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
     if (x.switched.length) steps.push(`Switched off for this house: ${x.switched.map((e) => e.name).join(", ")}.`);
   }
 
+  // The seasonings, in each placed citizen's own folder (house only); kept in house.json for citizens added later.
+  const placed = input.citizens.map((n) => path.join(input.root, "Pockets", n));
+  const sz = season(placed, input.home, deps.exec);
+  if (sz.added.length) steps.push(`Seasoned the house with ${sz.added.join(" and ")}.`);
+  if (sz.theirs.length) steps.push(`Left ${sz.theirs.join(" and ")} to your own Claude, which already has it.`);
+  if (sz.failed.length) steps.push(`Could not add ${sz.failed.join(" and ")}. The house works without it; Jarvis can add it later.`);
+
   // 5. A Paseo workspace with its face per citizen, then the first desk: Ultron's when he is there, else the one citizen's.
   const spaces: Record<string, string> = {};
   for (const n of input.citizens) {
@@ -147,6 +155,6 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   const recFile = path.join(input.root, "house.json");
   let rec: Record<string, unknown> = {}; try { rec = JSON.parse(fs.readFileSync(recFile, "utf8")); } catch { /* first run */ }
   const citizens = [...new Set([...((rec.citizens as string[]) ?? []), ...input.citizens])].sort();
-  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off, extrasSettings: extrasSettingsOut } : {}), desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
+  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off, extrasSettings: extrasSettingsOut } : {}), seasonSettings: sz.settings, desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
   return { ok: true, message: `${first} is ready. Finish setup here, then say hello.`, steps, firstDesk: { citizen: first, agentId: desk.agentId } };
 }
