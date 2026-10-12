@@ -116,7 +116,22 @@ export function listExtras(home: string): Extra[] {
 
 // Switch the chosen extras off in every pocket of the house, in its own `.claude/settings.local.json` (local, never
 // sent upstream), merged with what is there. Run again when a pocket is added; nothing doubles.
-export function applyExtrasOff(root: string, extras: Extra[], off: string[]): { pockets: string[]; switched: Extra[]; fixed: Extra[] } {
+// The settings that switch these extras off, alone: what every pocket gets, and what house.json keeps (extrasSettings)
+// so the house plugin's Citizens tab gives a citizen added later the same choice.
+export function extrasSettings(switched: Extra[]): Record<string, unknown> {
+  const skills: Record<string, string> = {}, plugins: Record<string, boolean> = {}, deny: string[] = [], excl: string[] = [];
+  for (const e of switched) {
+    if (e.kind === "skill" || e.kind === "command") skills[e.name] = "off";
+    else if (e.kind === "agent") deny.push(`Agent(${e.name})`);
+    else if (e.kind === "mcp") deny.push(`mcp__${e.name}`);
+    else if (e.kind === "plugin") plugins[e.name] = false;
+    else if (e.kind === "instructions" && e.file) excl.push(e.file);
+  }
+  return { ...(Object.keys(skills).length ? { skillOverrides: skills } : {}), ...(Object.keys(plugins).length ? { enabledPlugins: plugins } : {}),
+    ...(deny.length ? { permissions: { deny } } : {}), ...(excl.length ? { claudeMdExcludes: excl } : {}) };
+}
+
+export function applyExtrasOff(root: string, extras: Extra[], off: string[]): { pockets: string[]; switched: Extra[]; fixed: Extra[]; settings: Record<string, unknown> } {
   const chosen = extras.filter((e) => off.includes(e.id));
   const switched = chosen.filter((e) => e.switchable), fixed = chosen.filter((e) => !e.switchable);
   const pocketsDir = path.join(root, "Pockets");
@@ -142,5 +157,5 @@ export function applyExtrasOff(root: string, extras: Extra[], off: string[]): { 
     fs.mkdirSync(path.dirname(f), { recursive: true });
     fs.writeFileSync(f, JSON.stringify(next, null, 2) + "\n");
   }
-  return { pockets, switched, fixed };
+  return { pockets, switched, fixed, settings: extrasSettings(switched) };
 }

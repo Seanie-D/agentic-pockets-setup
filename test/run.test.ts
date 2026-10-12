@@ -121,5 +121,7 @@ test("the extras the user switched off are in every new pocket before its first 
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home, extras, extrasOff: ["skill:caveman"] }, w.deps);
   assert.equal(r.ok, true, r.message);
   assert.deepEqual(seenAtOpen?.skillOverrides, { caveman: "off" }, "the first desk starts with the extra already off");
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8")).extrasOff, ["skill:caveman"]);
+  const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.deepEqual(rec.extrasOff, ["skill:caveman"]);
+  assert.deepEqual(rec.extrasSettings, { skillOverrides: { caveman: "off" } }, "the settings a citizen added later gets (the Citizens tab)");
 });
