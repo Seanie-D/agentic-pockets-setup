@@ -30,6 +30,7 @@ export function ModeChoice({ s, mode, onPick, busy, askable, navigation }: {
           <Text style={s.quietText}>Ask about this</Text>
         </Pressable>
         {ask.data && <Text style={ask.data.ok ? s.good : s.muted}>{ask.data.message}</Text>}
+        {ask.isError && <Text style={s.bad}>{String(ask.error)}</Text>}
       </View>}
     </View>
   );

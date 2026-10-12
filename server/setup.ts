@@ -146,6 +146,8 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   const now = input.citizens.filter((n) => placedNow.includes(path.join(input.root, "Pockets", n)));
   const placedCitizens = [...new Set([...earlier, ...now])].sort();
   for (const n of mode === before.mode ? now : placedCitizens) setTier(path.join(input.root, "Pockets", n), mode);
+  // Kept at once, before any step that can fail, so a retry knows which pockets are setup's and which mode they took.
+  fs.writeFileSync(path.join(input.root, "house.json"), JSON.stringify({ setupDone: false, ...before, placedCitizens, mode }, null, 2) + "\n");
 
   // Ticket 004 Q2: the house plugin travels with setup. It holds the house's machinery (the Mailman, the nightly clock-out,
   // the save point) and its views, so it is placed in the house and added to Paseo before any desk opens. A folder already

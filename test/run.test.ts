@@ -294,3 +294,15 @@ test("a run with no mode keeps the house's mode", async () => {
   assert.equal(JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8")).mode, "always-on");
   assert.equal(tierIn(w.root, "Vision"), "standing");
 });
+
+test("a first run that fails after placing the pockets keeps their tiers and the record of them, so a retry is right", async () => {
+  const w = world();
+  const failing = { ...w.deps, ops: { ...w.deps.ops, openDesk: async () => { throw new Error("the daemon went away"); } } };
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Ultron", "Verro", "Vision"], accounts, root: w.root, home: w.home }, failing).catch(() => {});
+  const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.deepEqual(rec.placedCitizens, ["Jarvis", "Ultron", "Verro", "Vision"]);
+  assert.equal(rec.mode, "on-demand"); assert.equal(rec.setupDone, false);
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Ultron", "Verro", "Vision"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  for (const n of ["Ultron", "Verro", "Vision", "Jarvis"]) assert.equal(tierIn(w.root, n), "on-call", n);
+});

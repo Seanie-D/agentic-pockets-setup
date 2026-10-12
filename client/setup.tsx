@@ -200,15 +200,17 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         <Text style={s.h2}>How your citizens run</Text>
         <ModeChoice s={s} mode={d.mode} onPick={(m) => doMode.mutate({ mode: m })} busy={doMode.isPending} askable navigation={navigation} />
         {doMode.data && !doMode.data.ok && <Text style={s.bad}>{doMode.data.message}</Text>}
+        {doMode.isError && <Text style={s.bad}>{String(doMode.error)}</Text>}
         <Pressable accessibilityRole="button" style={s.button} onPress={() => doFinish.mutate({})}><Text style={s.buttonText}>Finish setup</Text></Pressable>
       </>}
       {d.setupDone && <Text style={s.good}>Setup is finished. Your citizens live in the sidebar. Go to them through their workspace any time.</Text>}
+      {d.setupDone && <TutorialView s={s} theme={theme} compact={layout.compact} navigation={navigation} />}
       {d.setupDone && <>
         <Text style={s.h2}>How your citizens run</Text>
         <ModeChoice s={s} mode={d.mode} onPick={(m) => doMode.mutate({ mode: m })} busy={doMode.isPending} askable navigation={navigation} />
         {doMode.data && !doMode.data.ok && <Text style={s.bad}>{doMode.data.message}</Text>}
+        {doMode.isError && <Text style={s.bad}>{String(doMode.error)}</Text>}
       </>}
-      {d.setupDone && <TutorialView s={s} theme={theme} compact={layout.compact} navigation={navigation} />}
     </View></ScrollView>
   );
 }
