@@ -50,6 +50,15 @@ export function ops(paseo: PaseoApi): Ops {
       return { workspaceId: w.id, projectId: w.projectId };
     },
     setIcon: setProjectIcon,
+    // Paseo's own config, through the SDK: the plugin is one more directory source, enabled. No command line is needed.
+    async addPlugin(id, dir) {
+      const { config } = await paseo.config.get();
+      const plugins = { ...((config as { plugins?: Record<string, unknown> }).plugins ?? {}), [id]: { source: "directory", path: dir, enabled: true } };
+      await paseo.config.patch({ plugins } as Parameters<PaseoApi["config"]["patch"]>[0]);
+      // Paseo keeps it, but starts it only at its next start or on a reload (proven 2026-10-12); the SDK has no reload,
+      // so the Paseo command does it where it is found (the Mac app ships it; see EXTRA_PATH).
+      return { running: exec("paseo", ["plugin", "reload", id]).status === 0 };
+    },
     async openDesk(o) {
       const w = handles.get(o.workspaceId);
       if (!w) throw new Error("the workspace was not made in this run");

@@ -12,6 +12,7 @@ function upstream() {
   const u = fs.mkdtempSync(path.join(os.tmpdir(), "upstream-"));
   const w = (f: string, body = "x") => { fs.mkdirSync(path.dirname(path.join(u, f)), { recursive: true }); fs.writeFileSync(path.join(u, f), body); };
   w("Commons/tenets.md", "11. **Scripts flag, {{USER_NAME}} decides.**\n"); w("Commons/skills/x/SKILL.md", "Fill {{SKIPS}} here; {{USER_NAME}} owns it.\n"); w("Pockets/_Template/core/VERSION", "0.1.22");
+  w("plugins/agentic-pockets/paseo-plugin.json", '{ "id": "agentic-pockets" }');
   for (const n of ["Ultron", "Jarvis", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
   return u;
 }
@@ -35,6 +36,7 @@ function world(opts: { claim?: number } = {}) {
     ops: {
       createWorkspace: async ({ dir, title }) => { log.push(`workspace ${title} ${dir}`); return { workspaceId: `wks_${title}`, projectId: `prj_${title}` }; },
       setIcon: async (projectId, png) => { log.push(`icon ${projectId} ${fs.readFileSync(png, "utf8")}`); },
+      addPlugin: async (id, dir) => { log.push(`plugin ${id} ${dir}`); return { running: true }; },
       openDesk: async (o) => { log.push(`desk ${o.title} ${o.provider}/${o.model} ${JSON.stringify(o.labels)} cwd=${o.cwd}`); return { agentId: "agent-1" }; },
     },
     hostname: () => "Nicks-MacBook", doorman: "https://doorman.example", now: () => "2026-10-14T13:00:00.000Z",
@@ -175,4 +177,33 @@ test("seasonings: one the user already has in their own Claude is left to theirs
   const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
   assert.deepEqual(rec.seasonSettings.enabledPlugins, { "context-mode@context-mode": true });
   assert.ok(r.steps.some((s) => /Left caveman to your own Claude/.test(s)));
+});
+
+// Ticket 004 Q2: the house plugin travels with setup. It holds the house's machinery (the Mailman, the nightly clock-out,
+// the save point) and its views, so setup places it in the house and adds it to Paseo before the first desk opens.
+test("the house plugin is placed in the house and added to Paseo before the first desk opens", async () => {
+  const w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  const dir = path.join(w.root, "plugins", "agentic-pockets");
+  assert.ok(fs.existsSync(path.join(dir, "paseo-plugin.json")), "placed in the house");
+  const at = w.log.findIndex((l) => l === `plugin agentic-pockets ${dir}`);
+  assert.ok(at >= 0, "added to Paseo"); assert.ok(at < w.log.findIndex((l) => l.startsWith("desk")), "before the first desk");
+});
+
+test("when Paseo will not add the house plugin, setup goes on and says so plainly", async () => {
+  const w = world();
+  w.deps.ops.addPlugin = async () => { throw new Error("plugins are switched off in Paseo"); };
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.ok(r.steps.some((s) => s.includes("could not add the house plugin") && s.includes("plugins are switched off in Paseo")), r.steps.join(" | "));
+});
+
+// Proven 2026-10-12 on a test Paseo: Paseo keeps a plugin added through its config, but starts it only at its next start or
+// on a reload. When setup cannot reload it, the user is told the one thing to do.
+test("when the house plugin is added but not started, setup tells the user to open Paseo again", async () => {
+  const w = world();
+  w.deps.ops.addPlugin = async () => ({ running: false });
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
+  assert.ok(r.steps.includes("Added the house plugin to Paseo. It starts the next time Paseo starts: quit Paseo and open it again."), r.steps.join(" | "));
 });

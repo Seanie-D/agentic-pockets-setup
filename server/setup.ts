@@ -10,6 +10,7 @@ export interface Exec { (cmd: string, args: string[], o?: { env?: Record<string,
 export interface Ops {
   createWorkspace(o: { dir: string; title: string }): Promise<{ workspaceId: string; projectId: string | null }>;
   setIcon(projectId: string, pngPath: string): Promise<void>;
+  addPlugin(id: string, dir: string): Promise<{ running: boolean }>;
   openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
 }
 export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; doorman: string; now: () => string }
@@ -111,6 +112,20 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
     put(path.join("Pockets", n));
   }
   steps.push(`Placed ${input.citizens.join(", ")} in ${input.root}.`);
+
+  // Ticket 004 Q2: the house plugin travels with setup. It holds the house's machinery (the Mailman, the nightly clock-out,
+  // the save point) and its views, so it is placed in the house and added to Paseo before any desk opens. A folder already
+  // here is kept; Paseo is told again, which changes nothing when it already has it.
+  let plugins: string[] = []; try { plugins = fs.readdirSync(path.join(upstream, "plugins")); } catch { /* a release without plugins */ }
+  for (const id of plugins) {
+    const to = path.join(input.root, "plugins", id);
+    if (!fs.existsSync(to)) fs.cpSync(path.join(upstream, "plugins", id), to, { recursive: true, verbatimSymlinks: true });
+    try {
+      const { running } = await deps.ops.addPlugin(id, to);
+      steps.push(running ? "Added the house plugin to Paseo." : "Added the house plugin to Paseo. It starts the next time Paseo starts: quit Paseo and open it again.");
+    }
+    catch (e) { steps.push(`Setup could not add the house plugin to Paseo (${String((e as Error)?.message ?? e).slice(0, 160)}). Your citizens work without it, but nothing wakes them on mail or closes them at night until it is added.`); }
+  }
 
   // Ticket 004 Q8: the extras the user switched off, for this house only, written before any desk starts (Claude Code reads
   // its settings when a session starts). Kept in house.json so a pocket added later gets them too.
