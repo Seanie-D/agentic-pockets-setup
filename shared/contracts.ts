@@ -20,7 +20,7 @@ export const connectRpc = defineRpc({ name: "setup.connect", input: z.object({ c
 export const installRpc = defineRpc({
   name: "setup.install",
   input: z.object({ userName: z.string().min(1), citizens: z.array(z.string()).min(1), accounts: z.record(z.string(), z.string()),
-    extrasOff: z.array(z.string()).default([]) }),
+    extrasOff: z.array(z.string()).default([]), cleanProfile: z.boolean().default(false) }),
   output: Result.extend({ firstDesk: z.object({ citizen: z.string(), agentId: z.string().nullable() }).optional() }),
 });
 // The welcome take-over (ticket 009): whether this computer has seen it, and marking it seen.
@@ -37,3 +37,6 @@ export const tutorialSeenRpc = defineRpc({ name: "setup.tutorial.seen", input: z
 export const tutorialDiscussRpc = defineRpc({ name: "setup.tutorial.discuss", input: z.object({ itemId: z.string() }),
   output: z.object({ ok: z.boolean(), agentId: z.string().optional(), citizen: z.string().optional(), message: z.string() }) });
 export const finishRpc = defineRpc({ name: "setup.finish", input: z.object({}), output: z.object({ ok: z.boolean() }) });
+// The clean profile's sign-in (ticket 004): is the house's own Claude folder signed in, and start the browser sign-in.
+export const profileStatusRpc = defineRpc({ name: "setup.profile.status", input: z.object({}), output: z.object({ signedIn: z.boolean() }) });
+export const profileSignInRpc = defineRpc({ name: "setup.profile.signin", input: z.object({}), output: z.object({ started: z.boolean(), message: z.string() }) });

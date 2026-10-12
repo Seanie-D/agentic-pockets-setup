@@ -1,5 +1,5 @@
 // The real outside world for the setup run, inside Paseo: processes, the doorman, and Paseo itself.
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 // The SDK names the Paseo handle in its handler context, so no outside package is needed in a clean install.
@@ -50,6 +50,12 @@ export function ops(paseo: PaseoApi): Ops {
       return { workspaceId: w.id, projectId: w.projectId };
     },
     setIcon: setProjectIcon,
+    // The clean profile: a provider that is Claude with the house's own folder (as Paseo's own docs build a second account).
+    async addProvider(id, configDir) {
+      const { config } = await paseo.config.get();
+      const providers = { ...((config as { providers?: Record<string, unknown> }).providers ?? {}), [id]: { extends: "claude", label: "Claude (Agentic Pockets)", env: { CLAUDE_CONFIG_DIR: configDir } } };
+      await paseo.config.patch({ providers } as Parameters<PaseoApi["config"]["patch"]>[0]);
+    },
     // Paseo's own config, through the SDK: the plugin is one more directory source, enabled. No command line is needed.
     async addPlugin(id, dir) {
       const { config } = await paseo.config.get();
@@ -97,4 +103,17 @@ export function rewardDeps(paseo: PaseoApi): RewardDeps {
 
 export function deps(paseo: PaseoApi): Deps {
   return { exec, fetch: globalThis.fetch, ops: ops(paseo), hostname: () => os.hostname().replace(/\.local$/, ""), doorman: DOORMAN, now: () => new Date().toISOString() };
+}
+
+// The clean profile's browser sign-in: `claude auth login` with the house's folder, left running on its own; Claude opens
+// the browser, and the screen asks claude auth status until it reads signed in. It has no terminal, so nothing waits on it.
+export function startSignIn(configDir: string): { started: boolean; message: string } {
+  try {
+    const env: NodeJS.ProcessEnv = { ...process.env, PATH: pathEnv(), CLAUDE_CONFIG_DIR: configDir };
+    delete env.PASEO_AGENT_ID; delete env.PASEO_AGENT_CWD;
+    const c = spawn("claude", ["auth", "login"], { env, detached: true, stdio: "ignore", shell: process.platform === "win32" });
+    c.on("error", () => { /* reported by the status check: still signed out */ });
+    c.unref();
+    return { started: true, message: "Your browser opens to sign in to Claude. Come back here when it says you are signed in." };
+  } catch (e) { return { started: false, message: `The sign-in did not start: ${String((e as Error)?.message ?? e).slice(0, 160)}` }; }
 }

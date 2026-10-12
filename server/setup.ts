@@ -3,6 +3,7 @@
 // inside Paseo and against fakes in the tests. Built by Jarvis, 2026-10-12.
 import fs from "node:fs";
 import path from "node:path";
+import { PROFILE_PROVIDER, profileDir } from "./profile.ts";
 import { season } from "./seasonings.ts";
 import { applyExtrasOff, type Extra } from "./tools.ts";
 
@@ -11,16 +12,17 @@ export interface Ops {
   createWorkspace(o: { dir: string; title: string }): Promise<{ workspaceId: string; projectId: string | null }>;
   setIcon(projectId: string, pngPath: string): Promise<void>;
   addPlugin(id: string, dir: string): Promise<{ running: boolean }>;
+  addProvider(id: string, configDir: string): Promise<void>;
   openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
 }
 export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; doorman: string; now: () => string }
-export interface SetupInput { code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string> }
+export interface SetupInput { code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean }
 export interface SetupResult { ok: boolean; message: string; steps: string[]; firstDesk?: { citizen: string; agentId: string | null } }
 
 // The first line of the first desk (ticket 004 Q11): setup is not finished, so the citizen says hello, sends the user
 // back to finish, and says they can ask it anything at any time.
 export const SETUP_LINE = "[SETUP] Setup has just started and is not finished yet. Say hello in one or two plain sentences, tell the user they can ask you anything at any time, and send them back to the Agentic Pockets setup screen to finish it.";
-const DEFAULT_MODEL: Record<string, string> = { claude: "claude-opus-5-5" };
+const DEFAULT_MODEL: Record<string, string> = { claude: "claude-opus-5-5", "claude-house": "claude-opus-5-5" };
 const HOUSE_MANAGER = "Jarvis";
 
 // The whole run, as the tests drive it: connect, then install.
@@ -143,6 +145,13 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   if (sz.added.length) steps.push(`Seasoned the house with ${sz.added.join(" and ")}.`);
   if (sz.theirs.length) steps.push(`Left ${sz.theirs.join(" and ")} to your own Claude, which already has it.`);
   if (sz.failed.length) steps.push(`Could not add ${sz.failed.join(" and ")}. The house works without it; Jarvis can add it later.`);
+
+  // The clean profile: the house's own Claude folder, as its own Paseo provider; every Claude desk of the house uses it.
+  if (input.cleanProfile) {
+    await deps.ops.addProvider(PROFILE_PROVIDER, profileDir(input.home));
+    input = { ...input, accounts: Object.fromEntries(input.citizens.map((n) => [n, (input.accounts[n] ?? "claude") === "claude" ? PROFILE_PROVIDER : input.accounts[n]])) };
+    steps.push("Gave the house its own Claude profile. Your own hooks stay in your other projects.");
+  }
 
   // 5. A Paseo workspace with its face per citizen, then the first desk: Ultron's when he is there, else the one citizen's.
   const spaces: Record<string, string> = {};

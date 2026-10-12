@@ -37,6 +37,7 @@ function world(opts: { claim?: number } = {}) {
       createWorkspace: async ({ dir, title }) => { log.push(`workspace ${title} ${dir}`); return { workspaceId: `wks_${title}`, projectId: `prj_${title}` }; },
       setIcon: async (projectId, png) => { log.push(`icon ${projectId} ${fs.readFileSync(png, "utf8")}`); },
       addPlugin: async (id, dir) => { log.push(`plugin ${id} ${dir}`); return { running: true }; },
+      addProvider: async (id, configDir) => { log.push(`provider ${id} ${configDir}`); },
       openDesk: async (o) => { log.push(`desk ${o.title} ${o.provider}/${o.model} ${JSON.stringify(o.labels)} cwd=${o.cwd}`); return { agentId: "agent-1" }; },
     },
     hostname: () => "Nicks-MacBook", doorman: "https://doorman.example", now: () => "2026-10-14T13:00:00.000Z",
@@ -206,4 +207,25 @@ test("when the house plugin is added but not started, setup tells the user to op
   w.deps.ops.addPlugin = async () => ({ running: false });
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
   assert.ok(r.steps.includes("Added the house plugin to Paseo. It starts the next time Paseo starts: quit Paseo and open it again."), r.steps.join(" | "));
+});
+
+// Ticket 004, the clean profile (the owner, via Ultron 2026-10-12 17:43Z: "it intelligently detects the user's other hooks"):
+// when the user has hooks of their own and picks it, the house runs Claude from its own folder, as a Paseo provider.
+test("a clean profile: the house's own Claude provider is added, and every Claude desk uses it", async () => {
+  const w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Ultron", "Verro"], accounts: { Ultron: "claude", Verro: "opencode" }, root: w.root, home: w.home, cleanProfile: true }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  const at = w.log.indexOf(`provider claude-house ${path.join(w.home, ".agentic-pockets", "claude")}`);
+  assert.ok(at >= 0 && at < w.log.findIndex((l) => l.startsWith("desk")), "added before the first desk");
+  assert.match(w.log.find((l) => l.startsWith("desk"))!, /^desk Ultron — desk claude-house\//);
+  const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.equal(rec.desks.Ultron.provider, "claude-house"); assert.equal(rec.desks.Jarvis.provider, "claude-house");
+  assert.equal(rec.desks.Verro.provider, "opencode", "another provider is left as picked");
+});
+
+test("without the clean profile nothing changes: no provider is added", async () => {
+  const w = world();
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Ultron"], accounts: { Ultron: "claude" }, root: w.root, home: w.home }, w.deps);
+  assert.ok(!w.log.some((l) => l.startsWith("provider")));
+  assert.match(w.log.find((l) => l.startsWith("desk"))!, /^desk Ultron — desk claude\//);
 });

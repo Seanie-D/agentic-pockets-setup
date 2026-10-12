@@ -4,9 +4,10 @@ import path from "node:path";
 import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { connect, install, packsIn } from "./server/setup";
 import { checkTools, installTools, listExtras } from "./server/tools";
-import { deps, discussDeps, exec, rewardDeps } from "./server/real";
+import { deps, discussDeps, exec, rewardDeps, startSignIn } from "./server/real";
+import { profileDir, signedIn } from "./server/profile";
 import { discuss } from "./server/discuss";
-import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc, welcomeDismissRpc, welcomeReadRpc } from "./shared/contracts";
+import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc, profileStatusRpc, profileSignInRpc, welcomeDismissRpc, welcomeReadRpc } from "./shared/contracts";
 import { markWelcomeSeen, welcomeSeen } from "./server/welcome";
 import { markSeen, readTutorial, realProbe, stateTicks } from "./server/tutorial";
 import { rewardPass } from "./server/reward";
@@ -41,8 +42,12 @@ export default function contribute(server: PluginServerContext) {
   server.handle(tutorialDiscussRpc, async ({ itemId }, { paseo }) => discuss(ROOT, itemId, discussDeps(paseo)));
   server.handle(installToolsRpc, async () => ({ tools: installTools(exec, process.platform) }));
   server.handle(connectRpc, async ({ code }, { paseo }) => connect({ code, root: ROOT, home: os.homedir() }, deps(paseo)));
-  server.handle(installRpc, async ({ userName, citizens, accounts, extrasOff }, { paseo }) => {
-    return install({ code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, root: ROOT, home: os.homedir() }, deps(paseo));
+  server.handle(profileStatusRpc, async () => ({ signedIn: signedIn(exec, os.homedir()) }));
+  server.handle(profileSignInRpc, async () => startSignIn(profileDir(os.homedir())));
+  server.handle(installRpc, async ({ userName, citizens, accounts, extrasOff, cleanProfile }, { paseo }) => {
+    // The clean profile needs its sign-in first: a signed-out folder would greet the user with "Not logged in".
+    if (cleanProfile && !signedIn(exec, os.homedir())) return { ok: false, message: "Sign in to Claude for your house first, or switch the clean profile off.", steps: [] };
+    return install({ code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, cleanProfile, root: ROOT, home: os.homedir() }, deps(paseo));
   });
   server.handle(finishRpc, async () => {
     const rec = record(); fs.writeFileSync(path.join(ROOT, "house.json"), JSON.stringify({ ...rec, setupDone: true, updatedAt: new Date().toISOString() }, null, 2) + "\n");

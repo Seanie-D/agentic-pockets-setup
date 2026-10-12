@@ -5,7 +5,7 @@ import { useRpc } from "@getpaseo/plugin/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { connectRpc, finishRpc, installRpc, installToolsRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
+import { connectRpc, finishRpc, installRpc, installToolsRpc, profileSignInRpc, profileStatusRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
 import { LeftAlone, Welcome } from "./welcome";
 import { TutorialView } from "./tutorial";
 import { PACKS, emptyPick, toggle, view, type Pick } from "../shared/picker";
@@ -52,6 +52,13 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const [pick, setPick] = useState<Pick>(emptyPick());
   const [accounts, setAccounts] = useState<Record<string, string>>({});
   const [extrasOff, setExtrasOff] = useState<string[]>([]);
+  // The clean profile (ticket 004): offered only when the user has Claude hooks of their own; default no.
+  const [cleanProfile, setCleanProfile] = useState(false);
+  const readProfile = useRpc(profileStatusRpc);
+  const profile = useQuery({ queryKey: ["setup.profile.status"], queryFn: () => readProfile({}), enabled: cleanProfile,
+    refetchInterval: (q) => (q.state.data?.signedIn ? false : 3_000) });
+  const signIn = useMutation({ mutationFn: useRpc(profileSignInRpc) });
+  const needsSignIn = cleanProfile && profile.data?.signedIn !== true;
 
   // The welcome comes first on a computer that has not seen it (ticket 009); either button marks it seen for good.
   const readWelcome = useRpc(welcomeReadRpc);
@@ -154,8 +161,23 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
           })}
         </>}
 
-        <Pressable accessibilityRole="button" style={[s.button, (!v.citizens.length || !userName.trim() || doInstall.isPending) && s.locked]} disabled={!v.citizens.length || !userName.trim() || doInstall.isPending}
-          onPress={() => doInstall.mutate({ userName: userName.trim(), citizens: v.citizens, accounts: Object.fromEntries(v.citizens.map((n) => [n, accountOf(n)])), extrasOff })}>
+        {d.extras.some((e) => e.kind === "hook") && <>
+          <Text style={s.p}>You have Claude hooks of your own. A hook runs in every project, and it cannot be switched off for one. Your house can use its own Claude profile, without your hooks. You sign in to Claude once more for it.</Text>
+          <View style={s.row}>
+            <Pressable accessibilityRole="switch" accessibilityState={{ checked: cleanProfile }} style={[s.quiet, cleanProfile && s.picked]} onPress={() => setCleanProfile(!cleanProfile)}>
+              <Text style={s.quietText}>{cleanProfile ? "Clean profile for my house" : "Keep my hooks in my house"}</Text>
+            </Pressable>
+          </View>
+          {cleanProfile && (profile.data?.signedIn
+            ? <Text style={s.good}>Signed in. Your house uses its own Claude profile.</Text>
+            : <>
+              <Pressable accessibilityRole="button" style={[s.quiet, { alignSelf: "flex-start" }]} disabled={signIn.isPending} onPress={() => signIn.mutate({})}><Text style={s.quietText}>Sign in to Claude for your house</Text></Pressable>
+              {signIn.data && <Text style={signIn.data.started ? s.muted : s.bad}>{signIn.data.message}</Text>}
+            </>)}
+        </>}
+
+        <Pressable accessibilityRole="button" style={[s.button, (!v.citizens.length || !userName.trim() || doInstall.isPending || needsSignIn) && s.locked]} disabled={!v.citizens.length || !userName.trim() || doInstall.isPending || needsSignIn}
+          onPress={() => doInstall.mutate({ userName: userName.trim(), citizens: v.citizens, accounts: Object.fromEntries(v.citizens.map((n) => [n, accountOf(n)])), extrasOff, cleanProfile })}>
           <Text style={s.buttonText}>{doInstall.isPending ? "Setting up…" : v.citizens.length ? `Start with ${v.citizens.map(label).join(", ")}` : "Pick someone to start with"}</Text>
         </Pressable>
         {doInstall.data && !doInstall.data.ok && <Text style={s.bad}>{doInstall.data.message}</Text>}
