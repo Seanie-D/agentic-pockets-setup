@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { connect, install, packsIn } from "./server/setup";
-import { applyExtrasOff, checkTools, installTools, listExtras } from "./server/tools";
+import { checkTools, installTools, listExtras } from "./server/tools";
 import { deps, exec } from "./server/real";
 import { connectRpc, finishRpc, installRpc, installToolsRpc, status } from "./shared/contracts";
 
@@ -21,12 +21,7 @@ export default function contribute(server: PluginServerContext) {
   server.handle(installToolsRpc, async () => ({ tools: installTools(exec, process.platform) }));
   server.handle(connectRpc, async ({ code }, { paseo }) => connect({ code, root: ROOT, home: os.homedir() }, deps(paseo)));
   server.handle(installRpc, async ({ userName, citizens, accounts, extrasOff }, { paseo }) => {
-    const r = await install({ code: "", userName, citizens, accounts, root: ROOT, home: os.homedir() }, deps(paseo));
-    if (!r.ok || !extrasOff.length) return r;
-    // Ticket 004 Q8: the extras the user switched off, for this house only; kept in house.json so a pocket added later gets them too.
-    const x = applyExtrasOff(ROOT, listExtras(os.homedir()), extrasOff);
-    const rec = record(); fs.writeFileSync(path.join(ROOT, "house.json"), JSON.stringify({ ...rec, extrasOff, updatedAt: new Date().toISOString() }, null, 2) + "\n");
-    return { ...r, steps: [...r.steps, ...(x.switched.length ? [`Switched off for this house: ${x.switched.map((e) => e.name).join(", ")}.`] : [])] };
+    return install({ code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, root: ROOT, home: os.homedir() }, deps(paseo));
   });
   server.handle(finishRpc, async () => {
     const rec = record(); fs.writeFileSync(path.join(ROOT, "house.json"), JSON.stringify({ ...rec, setupDone: true, updatedAt: new Date().toISOString() }, null, 2) + "\n");

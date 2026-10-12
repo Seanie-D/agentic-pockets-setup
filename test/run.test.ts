@@ -111,3 +111,15 @@ test("the house record keeps each citizen's desk row (account, model, workspace)
     Verro: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Verro" },
   });
 });
+
+test("the extras the user switched off are in every new pocket before its first desk opens, and kept in the house record", async () => {
+  const w = world();
+  let seenAtOpen: any = null;
+  const open = w.deps.ops.openDesk;
+  w.deps.ops.openDesk = async (o) => { try { seenAtOpen = JSON.parse(fs.readFileSync(path.join(o.cwd, ".claude", "settings.local.json"), "utf8")); } catch { seenAtOpen = "missing"; } return open(o); };
+  const extras = [{ id: "skill:caveman", kind: "skill" as const, name: "caveman", where: "~/.claude/skills/caveman", switchable: true }];
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home, extras, extrasOff: ["skill:caveman"] }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.deepEqual(seenAtOpen?.skillOverrides, { caveman: "off" }, "the first desk starts with the extra already off");
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8")).extrasOff, ["skill:caveman"]);
+});

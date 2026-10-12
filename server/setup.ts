@@ -3,6 +3,7 @@
 // inside Paseo and against fakes in the tests. Built by Jarvis, 2026-10-12.
 import fs from "node:fs";
 import path from "node:path";
+import { applyExtrasOff, type Extra } from "./tools.ts";
 
 export interface Exec { (cmd: string, args: string[], o?: { env?: Record<string, string> }): { status: number | null; stdout: string; stderr: string } }
 export interface Ops {
@@ -11,7 +12,7 @@ export interface Ops {
   openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
 }
 export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; doorman: string; now: () => string }
-export interface SetupInput { code: string; userName: string; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string> }
+export interface SetupInput { code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string> }
 export interface SetupResult { ok: boolean; message: string; steps: string[]; firstDesk?: { citizen: string; agentId: string | null } }
 
 // The first line of the first desk (ticket 004 Q11): setup is not finished, so the citizen says hello, sends the user
@@ -104,6 +105,14 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   }
   steps.push(`Placed ${input.citizens.join(", ")} in ${input.root}.`);
 
+  // Ticket 004 Q8: the extras the user switched off, for this house only, written before any desk starts (Claude Code reads
+  // its settings when a session starts). Kept in house.json so a pocket added later gets them too.
+  const off = input.extrasOff ?? [];
+  if (off.length) {
+    const x = applyExtrasOff(input.root, input.extras ?? [], off);
+    if (x.switched.length) steps.push(`Switched off for this house: ${x.switched.map((e) => e.name).join(", ")}.`);
+  }
+
   // 5. A Paseo workspace with its face per citizen, then the first desk: Ultron's when he is there, else the one citizen's.
   const spaces: Record<string, string> = {};
   for (const n of input.citizens) {
@@ -130,6 +139,6 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   const recFile = path.join(input.root, "house.json");
   let rec: Record<string, unknown> = {}; try { rec = JSON.parse(fs.readFileSync(recFile, "utf8")); } catch { /* first run */ }
   const citizens = [...new Set([...((rec.citizens as string[]) ?? []), ...input.citizens])].sort();
-  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
+  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off } : {}), desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
   return { ok: true, message: `${first} is ready. Finish setup here, then say hello.`, steps, firstDesk: { citizen: first, agentId: desk.agentId } };
 }
