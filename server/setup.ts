@@ -9,6 +9,7 @@ import { season } from "./seasonings.ts";
 import { applyExtrasOff, type Extra } from "./tools.ts";
 import { DEFAULT_MODE, tierFor, withTier, type Mode } from "../shared/mode.ts";
 import { CAFE } from "../shared/cafe.ts";
+import { BEAUTIFUL_CHAT } from "../shared/beautiful-chat.ts";
 
 export interface Exec { (cmd: string, args: string[], o?: { env?: Record<string, string>; cwd?: string }): { status: number | null; stdout: string; stderr: string } }
 export interface Ops {
@@ -16,7 +17,8 @@ export interface Ops {
   setIcon(projectId: string, pngPath: string): Promise<void>;
   addPlugin(id: string, dir: string): Promise<{ running: boolean }>;
   addProvider(id: string, configDir: string): Promise<void>;
-  installGitPlugin(source: string): Promise<void>;
+  installGitPlugin(source: string, ref?: string): Promise<void>;
+  hasPlugin(id: string): Promise<boolean>;
   welcome(agentId: string, citizen: string): Promise<void>;
   openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
 }
@@ -162,6 +164,13 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
       steps.push(running ? "Added the house plugin to Paseo." : "Added the house plugin to Paseo. It starts the next time Paseo starts: quit Paseo and open it again.");
     }
     catch (e) { steps.push(`Setup could not add the house plugin to Paseo (${String((e as Error)?.message ?? e).slice(0, 160)}). Your citizens work without it, but nothing wakes them on mail or closes them at night until it is added.`); }
+  }
+
+  // Beautiful Chat, in every house (ticket 022). A copy the user already has is theirs to keep.
+  if (await deps.ops.hasPlugin(BEAUTIFUL_CHAT.id).catch(() => false)) steps.push("Beautiful Chat is already in Paseo; setup kept yours.");
+  else {
+    try { await deps.ops.installGitPlugin(BEAUTIFUL_CHAT.source, BEAUTIFUL_CHAT.ref); steps.push("Added Beautiful Chat to Paseo: a cleaner look for every chat."); }
+    catch (e) { steps.push(`Setup could not add Beautiful Chat (${String((e as Error)?.message ?? e).slice(0, 160)}). Your house works without it. You can add it in Paseo: Settings, Plugins, Plugin source: ${BEAUTIFUL_CHAT.source}`); }
   }
 
   // The Paseo Cafe, only when the user ticked it; the house works without it.

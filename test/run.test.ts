@@ -16,7 +16,7 @@ function upstream() {
   for (const n of ["Ultron", "Jarvis", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
   return u;
 }
-function world(opts: { claim?: number; cafeFails?: boolean } = {}) {
+function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[] } = {}) {
   const up = upstream(); const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-")); const root = path.join(home, "agentic-pockets");
   const log: string[] = []; const posts: any[] = [];
   const deps: Deps = {
@@ -38,7 +38,8 @@ function world(opts: { claim?: number; cafeFails?: boolean } = {}) {
       setIcon: async (projectId, png) => { log.push(`icon ${projectId} ${fs.readFileSync(png, "utf8")}`); },
       addPlugin: async (id, dir) => { log.push(`plugin ${id} ${dir}`); return { running: true }; },
       addProvider: async (id, configDir) => { log.push(`provider ${id} ${configDir}`); },
-      installGitPlugin: async (source) => { log.push(`gitplugin ${source}`); if (opts.cafeFails) throw new Error("no paseo command"); },
+      installGitPlugin: async (source, ref) => { log.push(`gitplugin ${source}${ref ? ` @${ref}` : ""}`); if (source.includes("paseo-cafe") ? opts.cafeFails : opts.chatFails) throw new Error("no paseo command"); },
+      hasPlugin: async (id) => (opts.installed ?? []).includes(id),
       welcome: async (agentId, citizen) => { log.push(`welcome ${agentId} ${citizen}`); },
       openDesk: async (o) => { log.push(`desk ${o.title} ${o.provider}/${o.model} ${JSON.stringify(o.labels)} cwd=${o.cwd}`); return { agentId: "agent-1" }; },
     },
@@ -313,7 +314,7 @@ test("a first run that fails after placing the pockets keeps their tiers and the
 test("the Paseo Cafe: added only when the user ticks it, from its own Git source", async () => {
   let w = world();
   await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
-  assert.ok(!w.log.some((l) => l.startsWith("gitplugin")), "default off");
+  assert.ok(!w.log.some((l) => l.startsWith("gitplugin") && l.includes("paseo-cafe")), "default off");
   w = world();
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home, cafe: true }, w.deps);
   assert.ok(w.log.includes("gitplugin git:https://github.com/paseo-cafe/paseo-cafe.git:plugin"));
@@ -332,4 +333,29 @@ test("a citizen not in this release stops the run before any pocket is placed", 
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro", "Nobody"], accounts, root: w.root, home: w.home }, w.deps);
   assert.equal(r.ok, false);
   assert.ok(!fs.existsSync(path.join(w.root, "Pockets", "Verro")), "nothing placed");
+});
+
+// Beautiful Chat in every house (ticket 022; Sean, 2026-10-13 09:52 CDT: "integrating Beautiful Chat as part of its install").
+// Always installed, from its Git source pinned to the commit we reviewed, so neither the official directory nor the
+// Cafe's auto-update can move it before Friday walks the move.
+test("Beautiful Chat: always added, from its Git source, pinned to the reviewed commit", async () => {
+  const w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.ok(w.log.includes("gitplugin git:https://github.com/ABorakati/beautiful-chat.git @42b61d8301b5400a67821bbbfcf99fa8b681dc37"), w.log.join("\n"));
+  assert.ok(r.steps.includes("Added Beautiful Chat to Paseo: a cleaner look for every chat."));
+});
+
+test("Beautiful Chat: a copy already in Paseo is kept, not installed again", async () => {
+  const w = world({ installed: ["beautiful-chat"] });
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.ok(!w.log.some((l) => l.includes("beautiful-chat.git")));
+  assert.ok(r.steps.includes("Beautiful Chat is already in Paseo; setup kept yours."));
+});
+
+test("Beautiful Chat: when it cannot be added, setup goes on and says where to add it by hand", async () => {
+  const w = world({ chatFails: true });
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true);
+  assert.ok(r.steps.some((x) => x.startsWith("Setup could not add Beautiful Chat") && x.includes("Settings, Plugins") && x.includes("git:https://github.com/ABorakati/beautiful-chat.git")), r.steps.join("\n"));
 });
