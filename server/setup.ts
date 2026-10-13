@@ -13,7 +13,8 @@ import { BEAUTIFUL_CHAT } from "../shared/beautiful-chat.ts";
 
 export interface Exec { (cmd: string, args: string[], o?: { env?: Record<string, string>; cwd?: string }): { status: number | null; stdout: string; stderr: string } }
 export interface Ops {
-  createWorkspace(o: { dir: string; title: string }): Promise<{ workspaceId: string; projectId: string | null }>;
+  houseProject(root: string, name: string): Promise<string | null>;
+  createWorkspace(o: { dir: string; title: string; projectId?: string }): Promise<{ workspaceId: string; projectId: string | null }>;
   setIcon(projectId: string, pngPath: string): Promise<void>;
   addPlugin(id: string, dir: string): Promise<{ running: boolean }>;
   addProvider(id: string, configDir: string): Promise<void>;
@@ -31,6 +32,7 @@ export interface SetupResult { ok: boolean; message: string; steps: string[]; fi
 export const SETUP_LINE = "[SETUP] Setup has just started and is not finished yet. Say hello in one or two plain sentences, tell the user they can ask you anything at any time, and send them back to the Agentic Pockets setup screen to finish it.";
 const DEFAULT_MODEL: Record<string, string> = { claude: "claude-opus-5-5", "claude-house": "claude-opus-5-5" };
 const HOUSE_MANAGER = "Jarvis";
+export const HOUSE_PROJECT = "Agentic Pockets";
 
 // The whole run, as the tests drive it: connect, then install.
 export async function runSetup(input: SetupInput, deps: Deps): Promise<SetupResult> {
@@ -203,16 +205,21 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
     steps.push("Gave the house its own Claude profile. Your own hooks stay in your other projects.");
   }
 
-  // 5. A Paseo workspace with its face per citizen, then the first desk: Ultron's when he is there, else the one citizen's.
+  // 5. One Paseo project for the whole house (ticket 023: a new house starts in its final layout), a workspace in it per
+  // citizen, the house's one icon on it; then the first desk: Ultron's when he is there, else the one citizen's. The faces
+  // live in the house plugin's Citizens block, read from each pocket's face.png.
+  const projectId = await deps.ops.houseProject(input.root, HOUSE_PROJECT).catch(() => null);
   const spaces: Record<string, string> = {};
   for (const n of input.citizens) {
     const dir = path.join(input.root, "Pockets", n);
-    const w = await deps.ops.createWorkspace({ dir, title: n });
+    const w = await deps.ops.createWorkspace({ dir, title: n, ...(projectId ? { projectId } : {}) });
     spaces[n] = w.workspaceId;
-    const face = path.join(dir, "face.png");
-    if (w.projectId && fs.existsSync(face)) await deps.ops.setIcon(w.projectId, face).catch(() => { /* a face is nice, not needed */ });
+    // No house project (Paseo would not make one): each citizen has its own, so each wears its own face, as before.
+    if (!projectId && w.projectId && fs.existsSync(path.join(dir, "face.png"))) await deps.ops.setIcon(w.projectId, path.join(dir, "face.png")).catch(() => {});
   }
-  steps.push("Made a Paseo workspace for each citizen.");
+  const icon = path.join(upstream, "house.png");
+  if (projectId && fs.existsSync(icon)) await deps.ops.setIcon(projectId, icon).catch(() => { /* an icon is nice, not needed */ });
+  steps.push(projectId ? `Made the ${HOUSE_PROJECT} project in Paseo, with a workspace for each citizen.` : "Made a Paseo workspace for each citizen.");
   // Each citizen's desk row: what the house plugin opens a desk with (its Mailman and clock-in).
   const desks: Record<string, { provider: string; model: string; workspaceId: string }> = {};
   for (const n of input.citizens) {
@@ -231,6 +238,6 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   const recFile = path.join(input.root, "house.json");
   let rec: Record<string, unknown> = {}; try { rec = JSON.parse(fs.readFileSync(recFile, "utf8")); } catch { /* first run */ }
   const citizens = [...new Set([...((rec.citizens as string[]) ?? []), ...input.citizens])].sort();
-  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off, extrasSettings: extrasSettingsOut } : {}), seasonSettings: sz.settings, desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, placedCitizens, mode, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
+  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off, extrasSettings: extrasSettingsOut } : {}), seasonSettings: sz.settings, desks: { ...(rec.desks as object ?? {}), ...desks }, ...(projectId ? { projectId } : {}), citizens, placedCitizens, mode, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
   return { ok: true, message: `${first} is ready. Finish setup here, then say hello.`, steps, firstDesk: { citizen: first, agentId: desk.agentId } };
 }
