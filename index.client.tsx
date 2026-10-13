@@ -2,7 +2,7 @@ import type { PluginClientContext, PluginPopoverProps, PluginSidebarItemProps } 
 import { useRpc } from "@getpaseo/plugin/client";
 import { SidebarRow } from "@getpaseo/plugin/client/ui";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { SetupScreen } from "./client/setup";
 import { tutorialReadRpc, welcomeReadRpc } from "./shared/contracts";
 import { takeOver } from "./shared/welcome";
@@ -17,13 +17,14 @@ import { onPoint, takePoint } from "./shared/pointer";
 const g = globalThis as { __agenticPocketsWelcomeOpened?: boolean };
 
 // "Set up later" shows where setup lives (ticket 18): the row anchors a pop-up to itself, in the house pop-up's
-// look, and a circle pulses round it until the user presses the row or the pop-up's button, or 20 s pass.
+// look, and a circle pulses round it until the user presses the row or the pop-up closes, by its button or any other way.
 function PointerPopover({ theme, close, done }: PluginPopoverProps & { done: () => void }) {
   const c = theme.colors;
+  useEffect(() => done, [done]);
   return (
     <View style={{ gap: 10, padding: 14, maxWidth: 260, borderRadius: 12, borderWidth: 1, borderColor: c.accent, backgroundColor: c.surface1 }}>
       <Text style={{ color: c.foreground, fontSize: 15, lineHeight: 21 }}>Setup lives here. Press it whenever you want to start.</Text>
-      <Pressable accessibilityRole="button" onPress={() => { done(); close(); }}
+      <Pressable accessibilityRole="button" onPress={close}
         style={{ alignSelf: "flex-start", paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, backgroundColor: c.accent }}>
         <Text style={{ color: c.accentForeground, fontSize: 14, fontWeight: "600" }}>Got it</Text>
       </Pressable>
@@ -54,20 +55,16 @@ function Ring({ theme, on, children }: { theme: PluginSidebarItemProps["theme"];
 
 function SetupItem({ theme, currentScreen, openScreen, openPopover }: PluginSidebarItemProps) {
   const [ring, setRing] = useState(false);
+  const stopRing = useCallback(() => setRing(false), []);
   useEffect(() => {
     const point = () => {
       if (!takePoint()) return;
       setRing(true);
-      openPopover((p) => <PointerPopover {...p} done={() => setRing(false)} />);
+      openPopover((p) => <PointerPopover {...p} done={stopRing} />);
     };
     point();
     return onPoint(point);
   }, [openPopover]);
-  useEffect(() => {
-    if (!ring) return;
-    const timer = setTimeout(() => setRing(false), 20_000);
-    return () => clearTimeout(timer);
-  }, [ring]);
   const readWelcome = useRpc(welcomeReadRpc);
   const welcome = useQuery({ queryKey: ["setup.welcome.read"], queryFn: () => readWelcome({}) });
   useEffect(() => {

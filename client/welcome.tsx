@@ -25,12 +25,12 @@ export function Welcome({ s, onGo, onLeave }: { s: S; onGo: () => void; onLeave:
   );
 }
 
-// After "set up later" (ticket 18): the owner's line, and on a wide layout an arrow toward the sidebar, where the
-// setup row points at itself (index.client.tsx). On a phone the sidebar is a drawer, so no arrow.
-export function LeftAlone({ s, compact }: { s: S; compact: boolean }) {
+// After "set up later" (ticket 18): the owner's line and an arrow toward the sidebar, where the setup row points at
+// itself (index.client.tsx). On a phone the sidebar is a drawer that opens from the left, so the arrow still holds.
+export function LeftAlone({ s }: { s: S }) {
   return (
     <View style={[s.screen, { justifyContent: "center" }]}><View style={[s.body, { alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 16 }]}>
-      {!compact && <Text accessible={false} style={[s.h1, { fontSize: 40, lineHeight: 44 }]}>←</Text>}
+      <Text accessible={false} style={[s.h1, { fontSize: 40, lineHeight: 44 }]}>←</Text>
       <Text style={[s.h1, { flexShrink: 1 }]}>{LEFT_ALONE_LINE}</Text>
     </View></View>
   );

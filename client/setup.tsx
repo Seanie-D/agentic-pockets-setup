@@ -73,7 +73,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const welcome = useQuery({ queryKey: ["setup.welcome.read"], queryFn: () => readWelcome({}) });
   const dismiss = useMutation({ mutationFn: useRpc(welcomeDismissRpc), onSuccess: () => welcome.refetch() });
   const [left, setLeft] = useState(false);
-  if (left) return <LeftAlone s={s} compact={layout.compact} />;
+  if (left) return <LeftAlone s={s} />;
   if (welcome.data?.seen === false) return <Welcome s={s} onGo={() => dismiss.mutate({})} onLeave={() => { setLeft(true); askToPoint(); dismiss.mutate({}); }} />;
 
   const d = st.data;
