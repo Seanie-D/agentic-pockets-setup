@@ -30,7 +30,7 @@ export interface Ops {
   welcome(agentId: string, citizen: string): Promise<void>;
   openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
 }
-export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; doorman: string; now: () => string }
+export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; doorman: string; now: () => string; retryMs?: number }
 export interface SetupInput { paseoHome?: string; code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean; welcome?: boolean; mode?: Mode; cafe?: boolean }
 export interface SetupResult { ok: boolean; message: string; steps: string[]; firstDesk?: { citizen: string; agentId: string | null } }
 
@@ -189,8 +189,12 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   // Beautiful Chat, in every house (ticket 022). A copy the user already has is theirs to keep.
   if (await deps.ops.hasPlugin(BEAUTIFUL_CHAT.id).catch(() => false)) steps.push("Beautiful Chat is already in Paseo; setup kept yours.");
   else {
-    try { await deps.ops.installGitPlugin(BEAUTIFUL_CHAT.source, BEAUTIFUL_CHAT.ref); steps.push("Added Beautiful Chat to Paseo: a cleaner look for every chat."); }
-    catch (e) { steps.push(`Setup could not add Beautiful Chat (${String((e as Error)?.message ?? e).slice(0, 160)}). Your house works without it. You can add it in Paseo: Settings, Plugins, Plugin source: ${BEAUTIFUL_CHAT.source}`); }
+    // Twice, and a failure's reason in setup's own plugin log too (the owner's 15:51 walk: the Mac never got it, and the
+    // reason was on the screen only).
+    const once = () => deps.ops.installGitPlugin(BEAUTIFUL_CHAT.source, BEAUTIFUL_CHAT.ref);
+    try { await once().catch(async (e) => { console.error(`setup: Beautiful Chat install failed, trying again: ${String((e as Error)?.message ?? e).slice(0, 300)}`); await new Promise((r) => setTimeout(r, deps.retryMs ?? 3000)); return once(); });
+      steps.push("Added Beautiful Chat to Paseo: a cleaner look for every chat."); }
+    catch (e) { console.error(`setup: Beautiful Chat install failed twice: ${String((e as Error)?.message ?? e).slice(0, 300)}`); steps.push(`Setup could not add Beautiful Chat (${String((e as Error)?.message ?? e).slice(0, 160)}). Your house works without it. You can add it in Paseo: Settings, Plugins, Plugin source: ${BEAUTIFUL_CHAT.source}`); }
   }
 
   // The Paseo Cafe, only when the user ticked it; the house works without it. With the Cafe in Paseo, setup and Beautiful

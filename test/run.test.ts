@@ -17,7 +17,7 @@ function upstream() {
   for (const n of ["Ultron", "Jarvis", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
   return u;
 }
-function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[]; pin?: () => Promise<string | null>; pinNode?: (ids: string[]) => Promise<string | null>; deskOf?: (cwd: string) => Promise<string | null>; release?: object } = {}) {
+function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; chatFailsOnce?: boolean; installed?: string[]; pin?: () => Promise<string | null>; pinNode?: (ids: string[]) => Promise<string | null>; deskOf?: (cwd: string) => Promise<string | null>; release?: object } = {}) {
   const up = upstream();
   if (opts.release) fs.writeFileSync(path.join(up, "RELEASE.json"), JSON.stringify(opts.release));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-")); const root = path.join(home, "agentic-pockets");
@@ -44,12 +44,12 @@ function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean;
       pinClaude: opts.pin ?? (async () => null),
       pinNode: opts.pinNode ?? (async () => null),
       deskOf: opts.deskOf ?? (async () => null),
-      installGitPlugin: async (source, ref) => { log.push(`gitplugin ${source}${ref ? ` @${ref}` : ""}`); if (source.includes("paseo-cafe") ? opts.cafeFails : opts.chatFails) throw new Error("no paseo command"); },
+      installGitPlugin: async (source, ref) => { log.push(`gitplugin ${source}${ref ? ` @${ref}` : ""}`); if (!source.includes("paseo-cafe") && opts.chatFailsOnce && !log.some((l) => l === "chat failed once")) { log.push("chat failed once"); throw new Error("clone timed out"); } if (source.includes("paseo-cafe") ? opts.cafeFails : opts.chatFails) throw new Error("no paseo command"); },
       hasPlugin: async (id) => (opts.installed ?? []).includes(id),
       welcome: async (agentId, citizen) => { log.push(`welcome ${agentId} ${citizen}`); },
       openDesk: async (o) => { log.push(`desk ${o.title} ${o.provider}/${o.model} ${JSON.stringify(o.labels)} cwd=${o.cwd}`); return { agentId: "agent-1" }; },
     },
-    hostname: () => "Nicks-MacBook", doorman: "https://doorman.example", now: () => "2026-10-14T13:00:00.000Z",
+    hostname: () => "Nicks-MacBook", retryMs: 0, doorman: "https://doorman.example", now: () => "2026-10-14T13:00:00.000Z",
   };
   return { deps, home, root, log, posts };
 }
@@ -406,6 +406,14 @@ test("a run after a desk is already open opens no second desk", async () => {
   assert.equal(w.log.filter((l) => l.startsWith("desk ")).length, 0, w.log.join("\n"));
   assert.deepEqual(r.firstDesk, { citizen: "Ultron", agentId: "agent-ultron-1" });
   assert.ok(r.steps.includes("Ultron's desk was already open."), r.steps.join("\n"));
+});
+
+// The owner's 15:51 walk, 2026-10-13: the Mac never got Beautiful Chat. A failed install is tried once more.
+test("a Beautiful Chat install that fails once is tried again, and lands", async () => {
+  const w = world({ chatFailsOnce: true });
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.ok(r.steps.includes("Added Beautiful Chat to Paseo: a cleaner look for every chat."), r.steps.join("\n"));
+  assert.equal(w.log.filter((l) => l.includes("beautiful-chat")).length, 2, "two tries");
 });
 
 // The update system, ticket 06: setup changes only through the house's offer, so the Cafe never updates it.

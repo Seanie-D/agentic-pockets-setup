@@ -12,6 +12,7 @@ import type { RewardDeps } from "./reward";
 import { WELCOME_KIND } from "../shared/desk-welcome";
 import { cmdLine, joinPath, registryPath, withPath } from "../shared/winpath";
 import { findCommand, pinClaude, pinNode } from "../shared/claude-path";
+import { workspaceFor } from "../shared/workspace";
 
 export const DOORMAN = "https://pockets-doorman.sank-junior-purple.workers.dev";
 
@@ -62,6 +63,9 @@ export function ops(paseo: PaseoApi): Ops {
   const handles = new Map<string, Awaited<ReturnType<PaseoApi["workspaces"]["create"]>>>();
   return {
     async createWorkspace({ dir, title }) {
+      // The folder's own workspace when Paseo has one: Paseo would make a second beside it (shared/workspace.ts).
+      const have = workspaceFor(((await paseo.workspaces.list().catch(() => null))?.entries ?? []) as Parameters<typeof workspaceFor>[0], dir, process.platform === "win32");
+      if (have) { handles.set(have.workspaceId, paseo.workspaces.ref(have.workspaceId)); return have; }
       const w = await paseo.workspaces.create({ source: { kind: "directory", path: dir }, title });
       handles.set(w.id, w);
       return { workspaceId: w.id, projectId: w.projectId };
