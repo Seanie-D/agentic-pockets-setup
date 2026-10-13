@@ -4,7 +4,7 @@
 //   node --test test/claude-path.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { findCommand, pinClaude } from "../shared/claude-path.ts";
+import { findCommand, pinClaude, pinNode } from "../shared/claude-path.ts";
 
 const files = new Set(["/Users/ada/.local/bin/claude", "C:\\Users\\ada\\WinGet\\claude.exe"]);
 const isFile = (p: string) => files.has(p);
@@ -26,4 +26,24 @@ test("nothing changes when Paseo finds Claude itself, when the user set a comman
   assert.equal(pinClaude({}, "/Users/ada/.local/bin/claude", "/usr/local/bin/claude"), null);
   assert.equal(pinClaude({ claude: { command: ["/opt/my/claude"] } }, "/Users/ada/.local/bin/claude", null), null);
   assert.equal(pinClaude({}, null, null), null);
+});
+
+// Friday's read of Sean's 15:51 walk, 2026-10-13: setup found Node in /opt/homebrew/bin and said Ready, but a desk's
+// PATH never holds that folder, so the boot and clock hooks (node core/tools/okf.mjs …) could not run. Setup now gives
+// each Claude provider of the house a PATH that starts with Node's folder, when Paseo's own PATH lacks it.
+test("each Claude provider of the house is given Node's folder at the front of Paseo's own PATH", () => {
+  const paseoPath = "/Applications/Paseo.app/Contents/Resources/bin:/usr/bin:/bin";
+  assert.deepEqual(pinNode({ goose: { command: ["goose"] }, "claude-house": { extends: "claude", env: { CLAUDE_CONFIG_DIR: "/h" } } }, ["claude", "claude-house"], "/opt/homebrew/bin", paseoPath, ":"), {
+    goose: { command: ["goose"] },
+    claude: { env: { PATH: `/opt/homebrew/bin:${paseoPath}` } },
+    "claude-house": { extends: "claude", env: { CLAUDE_CONFIG_DIR: "/h", PATH: `/opt/homebrew/bin:${paseoPath}` } },
+  });
+  assert.deepEqual(pinNode({}, ["claude"], "C:\\Program Files\\nodejs", "C:\\Windows", ";"), { claude: { env: { PATH: "C:\\Program Files\\nodejs;C:\\Windows" } } });
+});
+
+test("no PATH is given when Paseo's PATH has Node's folder, when the user set one, or when Node was not found", () => {
+  assert.equal(pinNode({}, ["claude"], "/usr/local/bin", "/usr/local/bin:/usr/bin", ":"), null);
+  assert.equal(pinNode({ claude: { env: { PATH: "/mine" } } }, ["claude"], "/opt/homebrew/bin", "/usr/bin", ":"), null);
+  assert.equal(pinNode({}, ["claude"], null, "/usr/bin", ":"), null);
+  assert.equal(pinNode({}, ["claude-house"], "/opt/homebrew/bin", "/usr/bin", ":"), null, "a provider the house does not have is not made");
 });

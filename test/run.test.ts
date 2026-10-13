@@ -17,7 +17,7 @@ function upstream() {
   for (const n of ["Ultron", "Jarvis", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
   return u;
 }
-function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[]; pin?: () => Promise<string | null>; release?: object } = {}) {
+function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[]; pin?: () => Promise<string | null>; pinNode?: (ids: string[]) => Promise<string | null>; release?: object } = {}) {
   const up = upstream();
   if (opts.release) fs.writeFileSync(path.join(up, "RELEASE.json"), JSON.stringify(opts.release));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-")); const root = path.join(home, "agentic-pockets");
@@ -42,6 +42,7 @@ function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean;
       addPlugin: async (id, dir) => { log.push(`plugin ${id} ${dir}`); return { running: true }; },
       addProvider: async (id, configDir) => { log.push(`provider ${id} ${configDir}`); },
       pinClaude: opts.pin ?? (async () => null),
+      pinNode: opts.pinNode ?? (async () => null),
       installGitPlugin: async (source, ref) => { log.push(`gitplugin ${source}${ref ? ` @${ref}` : ""}`); if (source.includes("paseo-cafe") ? opts.cafeFails : opts.chatFails) throw new Error("no paseo command"); },
       hasPlugin: async (id) => (opts.installed ?? []).includes(id),
       welcome: async (agentId, citizen) => { log.push(`welcome ${agentId} ${citizen}`); },
@@ -380,6 +381,19 @@ test("setup says when it showed Paseo where Claude is, and why it could not", as
   const bad = world({ pin: async () => { throw new Error("config.patch refused"); } });
   const r2 = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: bad.root, home: bad.home }, bad.deps);
   assert.ok(r2.steps.includes("Could not show Paseo where Claude Code is: config.patch refused."), r2.steps.join("\n"));
+});
+
+// Friday's read of the owner's 15:51 walk, 2026-10-13: a Mac desk had no Node, so its hooks never ran. Setup gives
+// every Claude provider the house uses the folder Node is in, and says so; a failure is named, not hidden.
+test("setup shows the house's Claude providers where Node is, and why it could not", async () => {
+  const asked: string[][] = [];
+  const ok = world({ pinNode: async (ids: string[]) => { asked.push(ids); return "/opt/homebrew/bin"; } });
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: ok.root, home: ok.home, cleanProfile: true }, ok.deps);
+  assert.ok(r.steps.includes("Showed your citizens where Node is: /opt/homebrew/bin."), r.steps.join("\n"));
+  assert.deepEqual(asked, [["claude", "claude-house"]]);
+  const bad = world({ pinNode: async () => { throw new Error("config.patch refused"); } });
+  const r2 = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: bad.root, home: bad.home }, bad.deps);
+  assert.ok(r2.steps.includes("Could not show your citizens where Node is: config.patch refused."), r2.steps.join("\n"));
 });
 
 // The update system, ticket 06: setup changes only through the house's offer, so the Cafe never updates it.

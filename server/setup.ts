@@ -21,6 +21,8 @@ export interface Ops {
   addProvider(id: string, configDir: string): Promise<void>;
   // Gives Paseo Claude's full path when Paseo cannot find Claude itself; the path, or null when nothing changed.
   pinClaude(): Promise<string | null>;
+  // Each named Claude provider gets Node's folder at the front of its PATH, when Paseo's own PATH lacks it: the folder, or null.
+  pinNode(ids: string[]): Promise<string | null>;
   installGitPlugin(source: string, ref?: string): Promise<void>;
   hasPlugin(id: string): Promise<boolean>;
   welcome(agentId: string, citizen: string): Promise<void>;
@@ -232,6 +234,10 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   // Paseo must be able to start Claude before any desk opens (Friday's Mac walk, 2026-10-13: ~/.local/bin is not on its PATH).
   try { const at = await deps.ops.pinClaude(); if (at) steps.push(`Showed Paseo where Claude Code is: ${at}.`); }
   catch (e) { steps.push(`Could not show Paseo where Claude Code is: ${String((e as Error).message).slice(0, 160)}.`); }
+  // A desk's hooks run Node (the boot, the clock); Paseo's PATH may not hold the folder setup found it in (the owner's
+  // 15:51 walk, 2026-10-13: /opt/homebrew/bin on the Mac). Every Claude provider the house uses gets that folder.
+  try { const at = await deps.ops.pinNode(input.cleanProfile ? ["claude", PROFILE_PROVIDER] : ["claude"]); if (at) steps.push(`Showed your citizens where Node is: ${at}.`); }
+  catch (e) { steps.push(`Could not show your citizens where Node is: ${String((e as Error).message).slice(0, 160)}.`); }
 
   // 5. A Paseo workspace with its face per citizen, then the first desk: Ultron's when he is there, else the one citizen's.
   const spaces: Record<string, string> = {};

@@ -11,7 +11,7 @@ import type { AgentRecord, DiscussDeps } from "./discuss";
 import type { RewardDeps } from "./reward";
 import { WELCOME_KIND } from "../shared/desk-welcome";
 import { cmdLine, joinPath, registryPath, withPath } from "../shared/winpath";
-import { findCommand, pinClaude } from "../shared/claude-path";
+import { findCommand, pinClaude, pinNode } from "../shared/claude-path";
 
 export const DOORMAN = "https://pockets-doorman.sank-junior-purple.workers.dev";
 
@@ -111,6 +111,18 @@ export function ops(paseo: PaseoApi): Ops {
       const r = exec("paseo", ["reload"]);
       if (r.status !== 0) throw new Error(`Paseo has the path ${found}, but did not reload; quit and reopen Paseo`);
       return found;
+    },
+    // Node's folder, where setup finds Node but a desk's PATH (Paseo's own) does not hold it.
+    async pinNode(ids) {
+      const isFile = (p: string) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
+      const node = findCommand(pathEnv().split(path.delimiter), process.platform === "win32" ? ["node.exe"] : ["node"], path.sep, isFile);
+      const { config } = await paseo.config.get();
+      const providers = pinNode((config as { providers?: Record<string, Record<string, unknown>> }).providers ?? {}, ids, node ? path.dirname(node) : null, process.env.PATH ?? "", path.delimiter);
+      if (!providers) return null;
+      await paseo.config.patch({ providers } as Parameters<PaseoApi["config"]["patch"]>[0]);
+      const r = exec("paseo", ["reload"]);
+      if (r.status !== 0) throw new Error(`Paseo has Node's folder, but did not reload; quit and reopen Paseo`);
+      return path.dirname(node!);
     },
     async openDesk(o) {
       const w = handles.get(o.workspaceId);
