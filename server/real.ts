@@ -72,10 +72,15 @@ export function ops(paseo: PaseoApi): Ops {
       // so the Paseo command does it where it is found (the Mac app ships it; see EXTRA_PATH).
       return { running: exec("paseo", ["plugin", "reload", id]).status === 0 };
     },
+    // Whether Paseo already has a plugin of this id, from any source (the official directory, Git, a folder).
+    async hasPlugin(id) {
+      const { config } = await paseo.config.get();
+      return !!(config as { plugins?: Record<string, unknown> }).plugins?.[id];
+    },
     // A plugin from Git: Paseo's own command clones it and starts it (proven on a test Paseo, 2026-10-12); the SDK has no
     // install call. No command found: the caller tells the user where to add it by hand.
-    async installGitPlugin(source) {
-      const r = exec("paseo", ["plugin", "install", source, "--json"]);
+    async installGitPlugin(source, ref) {
+      const r = exec("paseo", ["plugin", "install", source, ...(ref ? ["--ref", ref] : []), "--json"]);
       if (r.status !== 0) throw new Error((r.stderr || r.stdout).trim().split("\n").pop()?.slice(0, 160) || "the Paseo command was not found");
     },
     async openDesk(o) {
