@@ -64,13 +64,13 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const profile = useQuery({ queryKey: ["setup.profile.status"], queryFn: () => readProfile({}), enabled: cleanProfile,
     refetchInterval: (q) => (q.state.data?.signedIn ? false : 3_000) });
   const signIn = useMutation({ mutationFn: useRpc(profileSignInRpc) });
-  const needsSignIn = cleanProfile && profile.data?.signedIn !== true;
   // The user's own Claude, signed in right after the tools (Sean, from Friday's Mac walk, 2026-10-13); asked every 3 s.
   const readClaude = useRpc(claudeStatusRpc);
   const claude = useQuery({ queryKey: ["setup.claude.status"], queryFn: () => readClaude({}), enabled: !!st.data?.tools.every((t) => t.state === "ok"),
     refetchInterval: (q) => (q.state.data?.signedIn ? false : 3_000) });
   const claudeSignIn = useMutation({ mutationFn: useRpc(claudeSignInRpc) });
   const claudeIn = claude.data?.signedIn === true;
+  const needsSignIn = cleanProfile ? profile.data?.signedIn !== true : claude.data?.signedIn !== true;
 
   // The welcome comes first on a computer that has not seen it (ticket 009); either button marks it seen for good.
   const readWelcome = useRpc(welcomeReadRpc);
