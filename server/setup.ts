@@ -52,6 +52,11 @@ export function packsIn(root: string): { name: string; hello: string }[] {
   });
 }
 
+// Git's ssh line for the house key. Git runs it through sh, also on Windows, so the path is one quoted word with
+// forward slashes: sh dropped the backslashes and split at a space.
+export const sshCommand = (key: string) =>
+  `ssh -i '${key.replace(/\\/g, "/").replace(/'/g, "'\\''")}' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new`;
+
 // Steps 1–3: the house key, the invite, the download (or an update, when the house is already here).
 export async function connect(input: Pick<SetupInput, "code" | "root" | "home">, deps: Deps): Promise<SetupResult> {
   const steps: string[] = [];
@@ -59,7 +64,7 @@ export async function connect(input: Pick<SetupInput, "code" | "root" | "home">,
   const keys = path.join(input.home, ".agentic-pockets", "keys");
   const key = path.join(keys, "house_ed25519");
   const upstream = path.join(input.root, ".upstream");
-  const ssh = `ssh -i ${key} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new`;
+  const ssh = sshCommand(key);
 
   // 1. The house's own key: made once, kept in the user's home, readable by the user alone.
   fs.mkdirSync(keys, { recursive: true, mode: 0o700 }); fs.chmodSync(keys, 0o700);

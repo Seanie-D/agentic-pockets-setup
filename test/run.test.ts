@@ -57,7 +57,7 @@ test("a full run: key, invite, house, a workspace and face per citizen, the firs
   assert.ok(w.log.some((l) => l.startsWith(`ssh-keygen -t ed25519`) && l.includes(key)));
   assert.equal((fs.statSync(path.join(w.home, ".agentic-pockets", "keys")).mode & 0o777), 0o700);
   assert.deepEqual(w.posts[0], { url: "https://doorman.example/claim", body: { code: "INVITE-CODE-123456789", publicKey: fs.readFileSync(`${key}.pub`, "utf8").trim(), house: "Nicks-MacBook" } });
-  assert.ok(w.log.some((l) => l.startsWith("git clone") && l.includes("git@github.com:Seanie-D/agentic-pockets.git") && l.includes(`-i ${key}`)), "cloned with the house key");
+  assert.ok(w.log.some((l) => l.startsWith("git clone") && l.includes("git@github.com:Seanie-D/agentic-pockets.git") && l.includes(`-i '${key}'`)), "cloned with the house key");
   for (const n of ["Ultron", "Verro", "Vision"]) assert.ok(fs.existsSync(path.join(w.root, "Pockets", n, "AGENTS.md")), `${n} is in the house`);
   assert.ok(!fs.existsSync(path.join(w.root, "Pockets", "Friday")), "a citizen not picked stays out");
   assert.ok(fs.existsSync(path.join(w.root, "Commons", "tenets.md")) && fs.existsSync(path.join(w.root, "Pockets", "_Template", "core", "VERSION")));
