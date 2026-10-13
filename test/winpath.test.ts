@@ -34,3 +34,13 @@ test("a tool installed after Paseo started is found: the registry's folders join
 test("How to get it for Claude opens the Quickstart page, not Advanced setup", () => {
   assert.equal(HELP.claude, "https://code.claude.com/docs/en/quickstart");
 });
+
+// Review round 1: Windows names it `Path`; a copy of process.env plus a new `PATH` key gives the child both, and which
+// wins is not sure. The PATH is set under the name the environment already uses, once.
+import { withPath } from "../shared/winpath.ts";
+test("the PATH is set under the environment's own name for it, and only once", () => {
+  assert.deepEqual(withPath({ Path: "C:\\old", TEMP: "x" }, "C:\\new"), { Path: "C:\\new", TEMP: "x" });
+  assert.deepEqual(withPath({ PATH: "/usr/bin" }, "/new"), { PATH: "/new" });
+  assert.deepEqual(withPath({ Path: "a", PATH: "b" }, "c"), { Path: "c" });
+  assert.deepEqual(withPath({ HOME: "/h" }, "/p"), { HOME: "/h", PATH: "/p" });
+});

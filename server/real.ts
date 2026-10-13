@@ -10,7 +10,7 @@ import type { Deps, Exec, Ops } from "./setup";
 import type { AgentRecord, DiscussDeps } from "./discuss";
 import type { RewardDeps } from "./reward";
 import { WELCOME_KIND } from "../shared/desk-welcome";
-import { joinPath, registryPath } from "../shared/winpath";
+import { joinPath, registryPath, withPath } from "../shared/winpath";
 
 export const DOORMAN = "https://pockets-doorman.sank-junior-purple.workers.dev";
 
@@ -24,13 +24,19 @@ const EXTRA_PATH = process.platform === "win32"
   : ["/opt/homebrew/bin", "/usr/local/bin", `${os.homedir()}/.local/bin`, `${os.homedir()}/.claude/local`,
     "/Applications/Paseo.app/Contents/Resources/bin", "/opt/Paseo/resources/bin"];
 // On Windows the registry's PATH joins too, read fresh each time, so a tool winget just installed is found at once.
+// Kept two seconds, so a run of commands reads the registry once, and a check after an install still reads it fresh.
+let regCache: { at: number; dirs: string[] } = { at: 0, dirs: [] };
 const reg = (key: string) => spawnSync("reg", ["query", key, "/v", "Path"], { encoding: "utf8", windowsHide: true, timeout: 10_000 }).stdout ?? "";
+const registryDirs = () => {
+  if (Date.now() - regCache.at > 2000) regCache = { at: Date.now(), dirs: registryPath(reg("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"), reg("HKCU\\Environment"), process.env) };
+  return regCache.dirs;
+};
 export const pathEnv = () => process.platform === "win32"
-  ? joinPath(";", process.env.PATH ?? "", registryPath(reg("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"), reg("HKCU\\Environment"), process.env), EXTRA_PATH)
+  ? joinPath(";", process.env.PATH ?? "", registryDirs(), EXTRA_PATH)
   : [process.env.PATH ?? "", ...EXTRA_PATH].filter(Boolean).join(":");
 
 export const exec: Exec = (cmd, args, o) => {
-  const env: NodeJS.ProcessEnv = { ...process.env, PATH: pathEnv(), ...(o?.env ?? {}) };
+  const env: NodeJS.ProcessEnv = { ...withPath({ ...process.env }, pathEnv()), ...(o?.env ?? {}) };
   delete env.PASEO_AGENT_ID; delete env.PASEO_AGENT_CWD;
   const r = spawnSync(cmd, args, { env, cwd: o?.cwd, encoding: "utf8", timeout: 300_000, shell: process.platform === "win32" });
   return { status: r.error ? 127 : r.status, stdout: r.stdout ?? "", stderr: (r.stderr ?? "") + (r.error ? String(r.error.message) : "") };
@@ -132,7 +138,7 @@ export function deps(paseo: PaseoApi): Deps {
 // the browser, and the screen asks claude auth status until it reads signed in. It has no terminal, so nothing waits on it.
 export function startSignIn(configDir: string): { started: boolean; message: string } {
   try {
-    const env: NodeJS.ProcessEnv = { ...process.env, PATH: pathEnv(), CLAUDE_CONFIG_DIR: configDir };
+    const env: NodeJS.ProcessEnv = { ...withPath({ ...process.env }, pathEnv()), CLAUDE_CONFIG_DIR: configDir };
     delete env.PASEO_AGENT_ID; delete env.PASEO_AGENT_CWD;
     const c = spawn("claude", ["auth", "login"], { env, detached: true, stdio: "ignore", shell: process.platform === "win32" });
     c.on("error", () => { /* reported by the status check: still signed out */ });

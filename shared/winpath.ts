@@ -19,11 +19,22 @@ export function registryPath(machineOut: string, userOut: string, env: Record<st
 
 // The PATH to run with: the one the process has, then each registry folder and each extra folder not already in it.
 export function joinPath(sep: string, current: string, registry: string[], extra: string[]): string {
+  const key = (p: string) => p.toLowerCase().replace(/[\\/]+$/, "");
   const out = current.split(sep).filter(Boolean);
-  const seen = new Set(out.map((p) => p.toLowerCase().replace(/[\\/]+$/, "")));
+  const seen = new Set(out.map(key));
   for (const p of [...registry, ...extra]) {
-    const k = p.toLowerCase().replace(/[\\/]+$/, "");
+    const k = key(p);
     if (!seen.has(k)) { seen.add(k); out.push(p); }
   }
   return out.join(sep);
+}
+
+// A copy of the environment with PATH set once, under the name it already has (`Path` on Windows), so a child process
+// never gets two PATH keys and an unsure winner.
+export function withPath<T extends Record<string, string | undefined>>(env: T, value: string): T {
+  const keys = Object.keys(env).filter((k) => k.toLowerCase() === "path");
+  const out: Record<string, string | undefined> = { ...env };
+  for (const k of keys) delete out[k];
+  out[keys[0] ?? "PATH"] = value;
+  return out as T;
 }
