@@ -101,3 +101,9 @@ test("a house with no citizen yet is told to finish setup, and nothing is sent",
   assert.equal(r.ok, false); assert.match(r.message, /no citizen/);
   assert.deepEqual(f.log, []);
 });
+
+// Ticket 022 (Ultron's yes, 2026-10-13): Help says what Beautiful Chat does to a pasted picture, in the approved words.
+test("Help's line on pasted pictures, word for word", async () => {
+  const { PICTURE_TIP } = await import("../shared/beautiful-chat.ts");
+  assert.equal(PICTURE_TIP, "Pasted a picture and cannot see it in your message? Your citizen still got it. To see it, turn off Settings → Beautiful Chat → Enhanced prompt bubble.");
+});
