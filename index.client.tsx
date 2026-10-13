@@ -18,9 +18,9 @@ const g = globalThis as { __agenticPocketsWelcomeOpened?: boolean };
 
 // "Set up later" shows where setup lives (ticket 18): the row anchors a pop-up to itself, in the house pop-up's
 // look, and a circle pulses round it until the user presses the row or the pop-up closes, by its button or any other way.
-function PointerPopover({ theme, close, done }: PluginPopoverProps & { done: () => void }) {
+function PointerPopover({ theme, close, onClosed }: PluginPopoverProps & { onClosed: () => void }) {
   const c = theme.colors;
-  useEffect(() => done, [done]);
+  useEffect(() => onClosed, [onClosed]); // runs when the pop-up unmounts, however it closed
   return (
     <View style={{ gap: 10, padding: 14, maxWidth: 260, borderRadius: 12, borderWidth: 1, borderColor: c.accent, backgroundColor: c.surface1 }}>
       <Text style={{ color: c.foreground, fontSize: 15, lineHeight: 21 }}>Setup lives here. Press it whenever you want to start.</Text>
@@ -60,7 +60,7 @@ function SetupItem({ theme, currentScreen, openScreen, openPopover }: PluginSide
     const point = () => {
       if (!takePoint()) return;
       setRing(true);
-      openPopover((p) => <PointerPopover {...p} done={stopRing} />);
+      openPopover((p) => <PointerPopover {...p} onClosed={stopRing} />);
     };
     point();
     return onPoint(point);
