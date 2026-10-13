@@ -183,11 +183,13 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
 
   // The Paseo Cafe, only when the user ticked it; the house works without it. With the Cafe in Paseo, setup goes on its
   // opt-out list first, before the Cafe's first update run: setup changes only through the house's offer (ticket 06).
-  if (input.cafe || await deps.ops.hasPlugin(CAFE.id)) {
-    const f = path.join(input.paseoHome ?? path.join(input.home, ".paseo"), "plugin-settings", CAFE.id, "directory-settings.json");
-    let cur = null; try { cur = JSON.parse(fs.readFileSync(f, "utf8")); } catch { /* none yet */ }
-    try { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(withOptOut(cur, SETUP_ID))); }
-    catch (e) { steps.push(`Setup could not keep the Paseo Cafe from updating it (${String((e as Error)?.message ?? e).slice(0, 120)}).`); }
+  if (input.cafe || await deps.ops.hasPlugin(CAFE.id).catch(() => false)) {
+    const f = path.join(input.paseoHome || path.join(input.home, ".paseo"), "plugin-settings", CAFE.id, "directory-settings.json");
+    try {
+      // Only a missing file means "none yet": a file setup cannot read is the user's, and is never written over.
+      const cur = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : null;
+      fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(withOptOut(cur, SETUP_ID)));
+    } catch (e) { steps.push(`Setup could not keep the Paseo Cafe from updating it (${String((e as Error)?.message ?? e).slice(0, 120)}).`); }
   }
   if (input.cafe) {
     try { await deps.ops.installGitPlugin(CAFE.source); steps.push("Added the Paseo Cafe to Paseo."); }

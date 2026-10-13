@@ -388,6 +388,12 @@ test("with the Cafe added, or already in Paseo, setup is on the Cafe's opt-out l
     const f = path.join(w.home, ".paseo", "plugin-settings", "paseo-cafe", "directory-settings.json");
     assert.deepEqual(JSON.parse(fs.readFileSync(f, "utf8")).values.autoUpdateOptOuts, ["agentic-pockets-setup"]);
   }
+  const bad = world({ installed: ["paseo-cafe"] });
+  const bf = path.join(bad.home, ".paseo", "plugin-settings", "paseo-cafe", "directory-settings.json");
+  fs.mkdirSync(path.dirname(bf), { recursive: true }); fs.writeFileSync(bf, "{ not json");
+  const rb = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: bad.root, home: bad.home }, bad.deps);
+  assert.equal(fs.readFileSync(bf, "utf8"), "{ not json", "a Cafe file setup cannot read is never written over");
+  assert.ok(rb.steps.some((x) => x.startsWith("Setup could not keep the Paseo Cafe from updating it")));
   const none = world();
   await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: none.root, home: none.home }, none.deps);
   assert.ok(!fs.existsSync(path.join(none.home, ".paseo", "plugin-settings", "paseo-cafe")), "no Cafe: nothing written");
