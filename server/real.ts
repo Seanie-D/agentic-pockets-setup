@@ -127,7 +127,9 @@ export function ops(paseo: PaseoApi): Ops {
       return path.dirname(node!);
     },
     async deskOf(cwd) {
-      const desk = discussDeps(paseo).records().find((r) => path.resolve(String(r.cwd ?? "")) === path.resolve(cwd) && !r.archivedAt && r.labels?.role === "desk");
+      // Windows paths ignore case, so a record's folder is matched the same way there.
+      const norm = (p: string) => (process.platform === "win32" ? path.resolve(p).toLowerCase() : path.resolve(p));
+      const desk = discussDeps(paseo).records().find((r) => norm(String(r.cwd ?? "")) === norm(cwd) && !r.archivedAt && r.labels?.role === "desk");
       return desk?.id ? String(desk.id) : null;
     },
     async openDesk(o) {
