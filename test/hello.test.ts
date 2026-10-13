@@ -30,3 +30,10 @@ I edit in **DaVinci Resolve Studio**, on *your* timeline.
 test("an empty page draws nothing", () => {
   assert.deepEqual(helloBlocks("  \n\n"), []);
 });
+
+test("a line that is all bold is a heading of its own, not run into the line below", () => {
+  assert.deepEqual(helloBlocks("**How I talk**\nShort and plain."), [
+    { kind: "heading", spans: [{ text: "How I talk" }] },
+    { kind: "paragraph", spans: [{ text: "Short and plain." }] },
+  ]);
+});

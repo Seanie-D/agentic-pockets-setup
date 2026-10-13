@@ -25,7 +25,7 @@ export function helloBlocks(md: string): Block[] {
   for (const line of md.split(/\r?\n/)) {
     const t = line.trim();
     if (!t) { open = null; continue; }
-    const h = /^#{1,6}\s+(.*)$/.exec(t);
+    const h = /^#{1,6}\s+(.*)$/.exec(t) ?? /^\*\*([^*]+)\*\*$/.exec(t);   // a line all in bold is a label: a heading
     const li = /^[-*]\s+(.*)$/.exec(t);
     if (h) { raw.push({ kind: "heading", text: h[1] }); open = null; }
     else if (li) { open = { kind: "item", text: li[1] }; raw.push(open); }
