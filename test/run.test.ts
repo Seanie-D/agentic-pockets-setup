@@ -7,6 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { runSetup, type Deps } from "../server/setup.ts";
+import { pieceHash } from "../server/pieces.ts";
 
 function upstream() {
   const u = fs.mkdtempSync(path.join(os.tmpdir(), "upstream-"));
@@ -16,8 +17,9 @@ function upstream() {
   for (const n of ["Ultron", "Jarvis", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
   return u;
 }
-function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[]; pin?: () => Promise<string | null> } = {}) {
-  const up = upstream(); const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-")); const root = path.join(home, "agentic-pockets");
+function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[]; pin?: () => Promise<string | null>; release?: object } = {}) {
+  const up = upstream();
+  if (opts.release) fs.writeFileSync(path.join(up, "RELEASE.json"), JSON.stringify(opts.release)); const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-")); const root = path.join(home, "agentic-pockets");
   const log: string[] = []; const posts: any[] = [];
   const deps: Deps = {
     exec: (cmd, args, o) => {
@@ -397,4 +399,22 @@ test("with the Cafe added, or already in Paseo, setup is on the Cafe's opt-out l
   const none = world();
   await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: none.root, home: none.home }, none.deps);
   assert.ok(!fs.existsSync(path.join(none.home, ".paseo", "plugin-settings", "paseo-cafe")), "no Cafe: nothing written");
+});
+
+// The update system, ticket 01: the house keeps the release it was built from, with each piece's hash as released and
+// as placed (placing fills in the owner's name), so a later compare tells our changes from the house's own.
+test("the house record names its base release, and each piece's hash as released and as placed", async () => {
+  const release = { format: 1, id: "r1base", setup: { ref: "abc1234" }, pieces: {
+    core: { hash: "h-core", depends: [] }, "pack:Verro": { hash: "h-verro", depends: ["core"] }, "pack:Vision": { hash: "h-vision", depends: ["core"] },
+    "commons:tenets.md": { hash: "h-tenets", depends: [] } } };
+  const w = world({ release });
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.equal(rec.release.id, "r1base"); assert.equal(rec.release.setupRef, "abc1234");
+  assert.equal(rec.release.pieces["pack:Verro"].hash, "h-verro");
+  assert.equal(rec.release.pieces["pack:Verro"].placed, pieceHash(w.root, "pack:Verro"));
+  assert.equal(rec.release.pieces["commons:tenets.md"].placed, pieceHash(w.root, "commons:tenets.md"));
+  assert.equal(rec.release.pieces["pack:Vision"].hash, "h-vision");
+  assert.equal(rec.release.pieces["pack:Vision"].placed, undefined, "not picked: released, not placed");
 });

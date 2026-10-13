@@ -10,6 +10,7 @@ import { applyExtrasOff, type Extra } from "./tools.ts";
 import { DEFAULT_MODE, tierFor, withTier, type Mode } from "../shared/mode.ts";
 import { CAFE, withOptOut } from "../shared/cafe.ts";
 import { BEAUTIFUL_CHAT } from "../shared/beautiful-chat.ts";
+import { pieceHash } from "./pieces.ts";
 
 const SETUP_ID = "agentic-pockets-setup";   // this plugin's own Paseo id (paseo-plugin.json)
 export interface Exec { (cmd: string, args: string[], o?: { env?: Record<string, string>; cwd?: string }): { status: number | null; stdout: string; stderr: string } }
@@ -252,6 +253,21 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   const recFile = path.join(input.root, "house.json");
   let rec: Record<string, unknown> = {}; try { rec = JSON.parse(fs.readFileSync(recFile, "utf8")); } catch { /* first run */ }
   const citizens = [...new Set([...((rec.citizens as string[]) ?? []), ...input.citizens])].sort();
-  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off, extrasSettings: extrasSettingsOut } : {}), seasonSettings: sz.settings, desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, placedCitizens, mode, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
+  // The update system, ticket 01: the release this house was built from, each piece's hash as released and, for what is
+  // here, as placed (placing fills in the owner's name), so a later compare tells our changes from the house's own.
+  // A piece recorded before keeps its record; a release with no RELEASE.json (older ones) records nothing.
+  let release = rec.release as { id: string; setupRef: string | null; pieces: Record<string, { hash: string; placed?: string }> } | undefined;
+  let m: { id?: string; setup?: { ref?: string }; pieces?: Record<string, { hash: string }> } | null = null;
+  try { m = JSON.parse(fs.readFileSync(path.join(upstream, "RELEASE.json"), "utf8")); } catch { /* an older release */ }
+  if (m?.pieces && m.id) {
+    const pieces = { ...(release?.pieces ?? {}) };
+    for (const [id, p] of Object.entries(m.pieces)) {
+      if (pieces[id]?.placed) continue;
+      const placed = pieceHash(input.root, id);
+      pieces[id] = { hash: p.hash, ...(placed ? { placed } : {}) };
+    }
+    release = { id: release?.id ?? m.id, setupRef: release?.setupRef ?? m.setup?.ref ?? null, pieces };
+  }
+  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off, extrasSettings: extrasSettingsOut } : {}), seasonSettings: sz.settings, desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, placedCitizens, mode, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, ...(release ? { release } : {}), createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
   return { ok: true, message: `${first} is ready. Finish setup here, then say hello.`, steps, firstDesk: { citizen: first, agentId: desk.agentId } };
 }
