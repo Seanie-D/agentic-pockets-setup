@@ -389,7 +389,7 @@ test("with the Cafe added, or already in Paseo, setup is on the Cafe's opt-out l
     const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home, cafe: o.cafe }, w.deps);
     assert.equal(r.ok, true, r.message);
     const f = path.join(w.home, ".paseo", "plugin-settings", "paseo-cafe", "directory-settings.json");
-    assert.deepEqual(JSON.parse(fs.readFileSync(f, "utf8")).values.autoUpdateOptOuts, ["agentic-pockets-setup"]);
+    assert.deepEqual(JSON.parse(fs.readFileSync(f, "utf8")).values.autoUpdateOptOuts, ["agentic-pockets-setup", "beautiful-chat"], "Paseo keeps no pin, so the opt-out is what holds both");
   }
   const bad = world({ installed: ["paseo-cafe"] });
   const bf = path.join(bad.home, ".paseo", "plugin-settings", "paseo-cafe", "directory-settings.json");

@@ -189,14 +189,15 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
     catch (e) { steps.push(`Setup could not add Beautiful Chat (${String((e as Error)?.message ?? e).slice(0, 160)}). Your house works without it. You can add it in Paseo: Settings, Plugins, Plugin source: ${BEAUTIFUL_CHAT.source}`); }
   }
 
-  // The Paseo Cafe, only when the user ticked it; the house works without it. With the Cafe in Paseo, setup goes on its
-  // opt-out list first, before the Cafe's first update run: setup changes only through the house's offer (ticket 06).
+  // The Paseo Cafe, only when the user ticked it; the house works without it. With the Cafe in Paseo, setup and Beautiful
+  // Chat go on its opt-out list first, before the Cafe's first update run: Paseo keeps no commit pin (proved 2026-10-13),
+  // so the opt-out is what holds them; they change only through the house's offer (update system, ticket 06).
   if (input.cafe || await deps.ops.hasPlugin(CAFE.id).catch(() => false)) {
     const f = path.join(input.paseoHome || path.join(input.home, ".paseo"), "plugin-settings", CAFE.id, "directory-settings.json");
     try {
       // Only a missing file means "none yet": a file setup cannot read is the user's, and is never written over.
       const cur = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : null;
-      fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(withOptOut(cur, SETUP_ID)));
+      fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(withOptOut(withOptOut(cur, SETUP_ID), BEAUTIFUL_CHAT.id)));
     } catch (e) { steps.push(`Setup could not keep the Paseo Cafe from updating it (${String((e as Error)?.message ?? e).slice(0, 120)}).`); }
   }
   if (input.cafe) {
