@@ -15,6 +15,7 @@ import { TutorialView } from "./tutorial";
 import { PACKS, emptyPick, toggle, view, type Pick } from "../shared/picker";
 import { openExternal } from "./web";
 import { HELP } from "../shared/help-links";
+import { Hello } from "./hello";
 
 const NAMES: Record<string, string> = { MissMinutes: "Miss Minutes" };
 const label = (n: string) => NAMES[n] ?? n;
@@ -79,6 +80,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const mode: Mode = modePick ?? d.mode ?? DEFAULT_MODE;
   const offered = d.packs.filter((p) => (PACKS as readonly string[]).includes(p.name));
   const ultronPack = d.packs.find((p) => p.name === "Ultron");
+  const jarvisPack = d.packs.find((p) => p.name === "Jarvis");
   const accountOf = (n: string) => accounts[n] ?? d.accounts[0] ?? "claude";
   const toolsOk = d.tools.every((t) => t.state === "ok");
   const installed = doInstall.data?.ok === true;
@@ -133,7 +135,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
           return (
             <Pressable key={p.name} accessibilityRole="checkbox" accessibilityState={{ checked: on }} style={[s.card, on && s.picked]} onPress={() => setPick(toggle(pick, p.name))}>
               <Text style={s.p}>{on ? "☑" : "☐"}  {label(p.name)}</Text>
-              <Text style={s.muted}>{p.hello.trim() || "A hello page is coming soon."}</Text>
+              <Hello s={s} md={p.hello} fallback="A hello page is coming soon." />
               {on && d.accounts.length > 1 && (
                 <View style={s.row}>{d.accounts.map((a) => (
                   <Pressable key={a} accessibilityRole="radio" accessibilityState={{ selected: accountOf(p.name) === a }} style={[s.quiet, accountOf(p.name) === a && s.picked]} onPress={() => setAccounts({ ...accounts, [p.name]: a })}>
@@ -146,10 +148,16 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         {ultronPack && (
           <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: v.ultron !== "free-off", disabled: v.ultron === "locked-on" }} style={[s.card, v.ultron !== "free-off" && s.picked, v.ultron === "locked-on" && s.locked]} onPress={() => setPick(toggle(pick, "Ultron"))}>
             <Text style={s.p}>{v.ultron !== "free-off" ? "☑" : "☐"}  Ultron{v.ultron === "locked-on" ? " (comes with two or more)" : ""}</Text>
-            <Text style={s.muted}>{ultronPack.hello.trim() || ULTRON_LINE}</Text>
+            <Hello s={s} md={ultronPack.hello} fallback={ULTRON_LINE} />
           </Pressable>
         )}
-        {d.packs.some((p) => p.name === "Jarvis") && <Text style={s.muted}>Jarvis, the house manager, comes with every house.</Text>}
+        {/* Jarvis is placed in every house (ticket 004: "At setup, always"), so he shows ticked and cannot be unticked. */}
+        {jarvisPack && (
+          <View accessibilityRole="checkbox" accessibilityState={{ checked: true, disabled: true }} style={[s.card, s.picked, s.locked]}>
+            <Text style={s.p}>☑  Jarvis (comes with every house; not counted toward Ultron's two)</Text>
+            <Hello s={s} md={jarvisPack.hello} fallback="The house manager. He keeps your house in order." />
+          </View>
+        )}
 
         <Text style={s.h2}>5. How your citizens run</Text>
         <Text style={s.muted}>You can change this after setup. Once your first citizen is up, you can ask it about this choice.</Text>
