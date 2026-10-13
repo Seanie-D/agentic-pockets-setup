@@ -232,8 +232,9 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         {d.extras.some((e) => e.kind === "hook") && <>
           <Text style={s.p}>You have Claude hooks of your own. A hook runs in every project, and it cannot be switched off for one. Your house can use its own Claude profile, without your hooks. You sign in to Claude once more for it.</Text>
           <View style={s.row}>
-            <Pressable accessibilityRole="switch" accessibilityState={{ checked: cleanProfile }} style={[s.quiet, cleanProfile && s.picked]} onPress={() => setCleanProfile(!cleanProfile)}>
-              <Text style={s.quietText}>{cleanProfile ? "Clean profile for my house" : "Keep my hooks in my house"}</Text>
+            {/* A checkbox whose two states read plainly (the owner's 15:51 walk: "it's not clear which state means what"). */}
+            <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: cleanProfile }} style={[s.card, cleanProfile && s.picked]} onPress={() => setCleanProfile(!cleanProfile)}>
+              <Text style={s.p}>{cleanProfile ? "☑" : "☐"}  Give my house its own Claude profile, without my hooks</Text>
             </Pressable>
           </View>
           {cleanProfile && (profile.data?.signedIn
@@ -250,7 +251,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         </Pressable>}
         <Pressable accessibilityRole="button" style={[s.button, (!v.citizens.length || !userName.trim() || doInstall.isPending || needsSignIn) && s.locked]} disabled={!v.citizens.length || !userName.trim() || doInstall.isPending || needsSignIn}
           onPress={() => doInstall.mutate({ userName: userName.trim(), citizens: v.citizens, accounts: Object.fromEntries(v.citizens.map((n) => [n, accountOf(n)])), extrasOff, cleanProfile, mode, cafe: cafe && !d.cafe })}>
-          <Text style={s.buttonText}>{doInstall.isPending ? "Setting up…" : v.citizens.length ? `Start with ${v.citizens.map(label).join(", ")}` : "Pick someone to start with"}</Text>
+          <Text style={s.buttonText}>{doInstall.isPending ? "Setting up…" : v.citizens.length ? `Start with ${[...v.citizens, ...(jarvisPack && !v.citizens.includes("Jarvis") ? ["Jarvis"] : [])].map(label).join(", ")}` : "Pick someone to start with"}</Text>
         </Pressable>
         {doInstall.data && !doInstall.data.ok && <Text style={s.bad}>{doInstall.data.message}</Text>}
         {doInstall.isError && <Text style={s.bad}>Setup stopped: {String(doInstall.error)}. Press the button again to go on.</Text>}
