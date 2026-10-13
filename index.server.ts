@@ -55,19 +55,19 @@ export default function contribute(server: PluginServerContext) {
   });
   server.handle(tutorialSeenRpc, async ({ id }) => { markSeen(ROOT, id); return { ok: true }; });
   server.handle(tutorialDiscussRpc, async ({ itemId }, { paseo }) => discuss(ROOT, itemId, discussDeps(paseo)));
-  server.handle(installToolsRpc, async () => toolsJob(async () => { try { return { tools: installTools(exec, process.platform) }; } catch (e) { return { tools: [], failed: String((e as Error)?.message ?? e).slice(0, 300) }; } }, { tools: [], running: true }));
-  server.handle(connectRpc, async ({ code }, { paseo }) => connectJob(() => connect({ code, root: ROOT, home: os.homedir() }, deps(paseo)).catch(failed), BUSY));
+  server.handle(installToolsRpc, async ({ run }) => toolsJob(run, async () => { try { return { tools: installTools(exec, process.platform) }; } catch (e) { return { tools: [], failed: String((e as Error)?.message ?? e).slice(0, 300) }; } }, { tools: [], running: true }));
+  server.handle(connectRpc, async ({ code, run }, { paseo }) => connectJob(run, () => connect({ code, root: ROOT, home: os.homedir() }, deps(paseo)).catch(failed), BUSY));
   server.handle(profileStatusRpc, async () => ({ signedIn: signedIn(exec, os.homedir()) }));
   server.handle(profileSignInRpc, async () => startSignIn(profileDir(os.homedir())));
   server.handle(claudeStatusRpc, async () => ({ signedIn: signedInTo(exec, null) }));
   server.handle(claudeSignInRpc, async () => startSignIn(null));
   server.handle(modeSetRpc, async ({ mode }) => setMode(ROOT, mode));
   server.handle(askRpc, async ({ topic }, { paseo }) => ask(ROOT, topic, discussDeps(paseo)));
-  server.handle(installRpc, async ({ userName, citizens, accounts, extrasOff, cleanProfile, mode, cafe }, { paseo }) => {
+  server.handle(installRpc, async ({ userName, citizens, accounts, extrasOff, cleanProfile, mode, cafe, run }, { paseo }) => {
     // Claude must be signed in first, the user's own or the clean profile's: a signed-out one greets the user with "Not logged in".
     if (!cleanProfile && !signedInTo(exec, null)) return { ok: false, message: "Sign in to Claude first: step 1, after the tools.", steps: [] };
     if (cleanProfile && !signedIn(exec, os.homedir())) return { ok: false, message: "Sign in to Claude for your house first, or switch the clean profile off.", steps: [] };
-    return installJob(() => install({ paseoHome: process.env.PASEO_HOME, code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, cleanProfile, mode, cafe, root: ROOT, home: os.homedir() }, deps(paseo)).catch(failed), BUSY);
+    return installJob(run, () => install({ paseoHome: process.env.PASEO_HOME, code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, cleanProfile, mode, cafe, root: ROOT, home: os.homedir() }, deps(paseo)).catch(failed), BUSY);
   });
   server.handle(finishRpc, async () => {
     const rec = record(); fs.writeFileSync(path.join(ROOT, "house.json"), JSON.stringify({ ...rec, setupDone: true, updatedAt: new Date().toISOString() }, null, 2) + "\n");

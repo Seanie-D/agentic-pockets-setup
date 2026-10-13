@@ -238,7 +238,8 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   catch (e) { steps.push(`Could not show Paseo where Claude Code is: ${String((e as Error).message).slice(0, 160)}.`); }
   // A desk's hooks run Node (the boot, the clock); Paseo's PATH may not hold the folder setup found it in (the owner's
   // 15:51 walk, 2026-10-13: /opt/homebrew/bin on the Mac). Every Claude provider the house uses gets that folder.
-  try { const at = await deps.ops.pinNode(input.cleanProfile ? ["claude", PROFILE_PROVIDER] : ["claude"]); if (at) steps.push(`Showed your citizens where Node is: ${at}.`); }
+  // Every provider a citizen's desk runs on (input.accounts, after the clean profile above), and Paseo's own claude.
+  try { const at = await deps.ops.pinNode([...new Set(["claude", ...Object.values(input.accounts)])]); if (at) steps.push(`Showed your citizens where Node is: ${at}.`); }
   catch (e) { steps.push(`Could not show your citizens where Node is: ${String((e as Error).message).slice(0, 160)}.`); }
 
   // 5. A Paseo workspace with its face per citizen, then the first desk: Ultron's when he is there, else the one citizen's.

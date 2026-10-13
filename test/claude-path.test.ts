@@ -47,3 +47,10 @@ test("no PATH is given when Paseo's PATH has Node's folder, when the user set on
   assert.equal(pinNode({}, ["claude"], null, "/usr/bin", ":"), null);
   assert.equal(pinNode({}, ["claude-house"], "/opt/homebrew/bin", "/usr/bin", ":"), null, "a provider the house does not have is not made");
 });
+
+// Review, 2026-10-13: on Windows the variable is "Path"; a provider env named "PATH" beside it is two keys for one.
+test("on Windows the PATH goes under the name the system uses, and a folder already there is found in any case", () => {
+  assert.deepEqual(pinNode({}, ["claude"], "C:\\Program Files\\nodejs", "C:\\Windows", ";", "Path"), { claude: { env: { Path: "C:\\Program Files\\nodejs;C:\\Windows" } } });
+  assert.equal(pinNode({}, ["claude"], "C:\\Program Files\\nodejs", "c:\\program files\\nodejs;C:\\Windows", ";", "Path"), null);
+  assert.equal(pinNode({ claude: { env: { path: "C:\\mine" } } }, ["claude"], "C:\\Program Files\\nodejs", "C:\\Windows", ";", "Path"), null);
+});

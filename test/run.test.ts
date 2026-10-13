@@ -391,7 +391,7 @@ test("setup shows the house's Claude providers where Node is, and why it could n
   const ok = world({ pinNode: async (ids: string[]) => { asked.push(ids); return "/opt/homebrew/bin"; } });
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: ok.root, home: ok.home, cleanProfile: true }, ok.deps);
   assert.ok(r.steps.includes("Showed your citizens where Node is: /opt/homebrew/bin."), r.steps.join("\n"));
-  assert.deepEqual(asked, [["claude", "claude-house"]]);
+  assert.deepEqual(asked, [["claude", "claude-house"]], "Paseo's claude and every account a desk uses");
   const bad = world({ pinNode: async () => { throw new Error("config.patch refused"); } });
   const r2 = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: bad.root, home: bad.home }, bad.deps);
   assert.ok(r2.steps.includes("Could not show your citizens where Node is: config.patch refused."), r2.steps.join("\n"));

@@ -23,14 +23,19 @@ export function pinClaude(providers: Providers, found: string | null, paseoFinds
 // 15:51 walk, 2026-10-13: Node in /opt/homebrew/bin, a desk's PATH without it, so no boot or clock hook ran). `claude`
 // is Paseo's own and always there; any other id is changed only when the house has it. null when nothing should
 // change: Node was not found, Paseo's own PATH has its folder, or every provider already has a PATH of the user's.
-export function pinNode(providers: Providers, ids: string[], nodeDir: string | null, paseoPath: string, delim: string): Providers | null {
-  if (!nodeDir || paseoPath.split(delim).includes(nodeDir)) return null;
+// key: the name the system gives the variable ("Path" on Windows, whose names ignore case, so a folder or a user's own
+// PATH is matched in any case there).
+export function pinNode(providers: Providers, ids: string[], nodeDir: string | null, paseoPath: string, delim: string, key = "PATH"): Providers | null {
+  const anyCase = key !== "PATH";
+  const same = (a: string, b: string) => (anyCase ? a.toLowerCase() === b.toLowerCase() : a === b);
+  if (!nodeDir || paseoPath.split(delim).some((d) => same(d.replace(/[\\/]+$/, ""), nodeDir.replace(/[\\/]+$/, "")))) return null;
   const out: Providers = { ...providers };
   let changed = false;
   for (const id of ids) {
     const p = providers[id];
-    if ((!p && id !== "claude") || (p?.env as Record<string, unknown> | undefined)?.PATH) continue;
-    out[id] = { ...(p ?? {}), env: { ...((p?.env as Record<string, unknown>) ?? {}), PATH: [nodeDir, paseoPath].filter(Boolean).join(delim) } };
+    const env = (p?.env as Record<string, unknown> | undefined) ?? {};
+    if ((!p && id !== "claude") || Object.keys(env).some((k) => same(k, key))) continue;
+    out[id] = { ...(p ?? {}), env: { ...env, [key]: [nodeDir, paseoPath].filter(Boolean).join(delim) } };
     changed = true;
   }
   return changed ? out : null;

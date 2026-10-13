@@ -117,7 +117,9 @@ export function ops(paseo: PaseoApi): Ops {
       const isFile = (p: string) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
       const node = findCommand(pathEnv().split(path.delimiter), process.platform === "win32" ? ["node.exe"] : ["node"], path.sep, isFile);
       const { config } = await paseo.config.get();
-      const providers = pinNode((config as { providers?: Record<string, Record<string, unknown>> }).providers ?? {}, ids, node ? path.dirname(node) : null, process.env.PATH ?? "", path.delimiter);
+      // On Windows the variable's own name is kept (usually "Path"), so a desk never gets two names for one PATH.
+      const key = process.platform === "win32" ? (Object.keys(process.env).find((k) => k.toUpperCase() === "PATH") ?? "Path") : "PATH";
+      const providers = pinNode((config as { providers?: Record<string, Record<string, unknown>> }).providers ?? {}, ids, node ? path.dirname(node) : null, process.env[key] ?? "", path.delimiter, key);
       if (!providers) return null;
       await paseo.config.patch({ providers } as Parameters<PaseoApi["config"]["patch"]>[0]);
       const r = exec("paseo", ["reload"]);

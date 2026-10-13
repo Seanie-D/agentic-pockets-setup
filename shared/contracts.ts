@@ -16,12 +16,14 @@ export const status = defineRpc({
   output: z.object({ tools: z.array(Tool), extras: z.array(Extra), root: z.string(), connected: z.boolean(),
     packs: z.array(z.object({ name: z.string(), hello: z.string() })), accounts: z.array(z.string()), setupDone: z.boolean(), mode: z.enum(["on-demand", "always-on"]), cafe: z.boolean() }),
 });
-export const installToolsRpc = defineRpc({ name: "setup.tools.install", input: z.object({}), output: z.object({ tools: z.array(Installed), running: z.boolean().optional(), failed: z.string().optional() }) });
-export const connectRpc = defineRpc({ name: "setup.connect", input: z.object({ code: z.string().min(8) }), output: Result });
+// run: the screen's id for one press (shared/job.ts), so a repeated call of that press joins its job.
+export const installToolsRpc = defineRpc({ name: "setup.tools.install", input: z.object({ run: z.string().default("") }), output: z.object({ tools: z.array(Installed), running: z.boolean().optional(), failed: z.string().optional() }) });
+export const connectRpc = defineRpc({ name: "setup.connect", input: z.object({ code: z.string().min(8), run: z.string().default("") }), output: Result });
 export const installRpc = defineRpc({
   name: "setup.install",
   input: z.object({ userName: z.string().min(1), citizens: z.array(z.string()).min(1), accounts: z.record(z.string(), z.string()),
-    extrasOff: z.array(z.string()).default([]), cleanProfile: z.boolean().default(false), mode: z.enum(["on-demand", "always-on"]).default("on-demand"), cafe: z.boolean().default(false) }),
+    extrasOff: z.array(z.string()).default([]), cleanProfile: z.boolean().default(false), mode: z.enum(["on-demand", "always-on"]).default("on-demand"), cafe: z.boolean().default(false),
+    run: z.string().default("") }),
   output: Result.extend({ firstDesk: z.object({ citizen: z.string(), agentId: z.string().nullable() }).optional() }),
 });
 // The welcome take-over (ticket 009): whether this computer has seen it, and marking it seen.
