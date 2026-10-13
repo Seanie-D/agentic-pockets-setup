@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { runSetup, type Deps } from "../server/setup.ts";
+import { runSetup, setMode, type Deps } from "../server/setup.ts";
 import { pieceHash } from "../server/pieces.ts";
 
 function upstream() {
@@ -19,7 +19,8 @@ function upstream() {
 }
 function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[]; pin?: () => Promise<string | null>; release?: object } = {}) {
   const up = upstream();
-  if (opts.release) fs.writeFileSync(path.join(up, "RELEASE.json"), JSON.stringify(opts.release)); const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-")); const root = path.join(home, "agentic-pockets");
+  if (opts.release) fs.writeFileSync(path.join(up, "RELEASE.json"), JSON.stringify(opts.release));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-")); const root = path.join(home, "agentic-pockets");
   const log: string[] = []; const posts: any[] = [];
   const deps: Deps = {
     exec: (cmd, args, o) => {
@@ -417,4 +418,10 @@ test("the house record names its base release, and each piece's hash as released
   assert.equal(rec.release.pieces["commons:tenets.md"].placed, pieceHash(w.root, "commons:tenets.md"));
   assert.equal(rec.release.pieces["pack:Vision"].hash, "h-vision");
   assert.equal(rec.release.pieces["pack:Vision"].placed, undefined, "not picked: released, not placed");
+  assert.equal(rec.release.pieces["pack:Verro"].release, "r1base", "each piece names the release it came from");
+  // The tier set while setup is unfinished is placement too: the record follows it.
+  fs.writeFileSync(path.join(w.root, "Pockets/Verro/AGENTS.md"), "---\ntier: on-call\n---\n# Verro\n");
+  setMode(w.root, "always-on");
+  const after = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.equal(after.release.pieces["pack:Verro"].placed, pieceHash(w.root, "pack:Verro"));
 });

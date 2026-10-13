@@ -114,6 +114,13 @@ export function setMode(root: string, mode: Mode): { ok: boolean; changed: strin
   let rec: Record<string, unknown>;
   try { rec = JSON.parse(fs.readFileSync(recFile, "utf8")); } catch { return { ok: false, changed: [], message: "This house has no house record yet. Finish setup first." }; }
   const changed = ((rec.placedCitizens as string[]) ?? []).filter((n) => setTier(path.join(root, "Pockets", n), mode)).sort();
+  // While setup is unfinished the tier is placement, so each changed pack's placed hash follows it (update system,
+  // ticket 01); after Finish a mode change is the owner's own, and the compare shows it as the house's edit.
+  const release = rec.release as { pieces?: Record<string, { placed?: string }> } | undefined;
+  if (rec.setupDone !== true && release?.pieces) for (const n of changed) {
+    const p = release.pieces[`pack:${n}`];
+    if (p) p.placed = pieceHash(root, `pack:${n}`) ?? p.placed;
+  }
   fs.writeFileSync(recFile, JSON.stringify({ ...rec, mode, updatedAt: new Date().toISOString() }, null, 2) + "\n");
   return { ok: true, changed };
 }
@@ -256,7 +263,7 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   // The update system, ticket 01: the release this house was built from, each piece's hash as released and, for what is
   // here, as placed (placing fills in the owner's name), so a later compare tells our changes from the house's own.
   // A piece recorded before keeps its record; a release with no RELEASE.json (older ones) records nothing.
-  let release = rec.release as { id: string; setupRef: string | null; pieces: Record<string, { hash: string; placed?: string }> } | undefined;
+  let release = rec.release as { id: string; setupRef: string | null; pieces: Record<string, { hash: string; release: string; placed?: string }> } | undefined;
   let m: { id?: string; setup?: { ref?: string }; pieces?: Record<string, { hash: string }> } | null = null;
   try { m = JSON.parse(fs.readFileSync(path.join(upstream, "RELEASE.json"), "utf8")); } catch { /* an older release */ }
   if (m?.pieces && m.id) {
@@ -264,7 +271,7 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
     for (const [id, p] of Object.entries(m.pieces)) {
       if (pieces[id]?.placed) continue;
       const placed = pieceHash(input.root, id);
-      pieces[id] = { hash: p.hash, ...(placed ? { placed } : {}) };
+      pieces[id] = { hash: p.hash, release: m.id, ...(placed ? { placed } : {}) };
     }
     release = { id: release?.id ?? m.id, setupRef: release?.setupRef ?? m.setup?.ref ?? null, pieces };
   }
