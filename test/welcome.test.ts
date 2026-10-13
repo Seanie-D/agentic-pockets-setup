@@ -28,3 +28,24 @@ test("the words are the owner's, verbatim", () => {
   assert.equal(WELCOME_LINE, "Welcome to Sean's Agentic Pockets! Let's walk through setting up your agents.");
   assert.equal(LEAVE_ME_ALONE, "set up later, leave my Paseo alone!");
 });
+
+// Ticket 18 (Sean, 2026-10-13 08:34 CDT, via Ultron): "set up later" shows where setup lives.
+test("the line after 'set up later' is the owner's, verbatim", async () => {
+  const { LEFT_ALONE_LINE } = await import("../shared/welcome.ts");
+  assert.equal(LEFT_ALONE_LINE, "Got it! You can start setup again any time you want by clicking the plugin over here.");
+});
+
+test("'set up later' asks the sidebar row to point once, and the row takes the ask once", async () => {
+  const { askToPoint, takePoint, onPoint } = await import("../shared/pointer.ts");
+  assert.equal(takePoint(), false, "nothing to take before the ask");
+  let heard = 0;
+  const off = onPoint(() => { heard += 1; });
+  askToPoint();
+  assert.equal(heard, 1, "a mounted row hears the ask at once");
+  assert.equal(takePoint(), true);
+  assert.equal(takePoint(), false, "taken once: a second render, or a reload, points at nothing");
+  off();
+  askToPoint();
+  assert.equal(heard, 1, "a row that has gone hears nothing");
+  assert.equal(takePoint(), true, "a row that mounts later still finds the ask");
+});
