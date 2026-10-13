@@ -93,6 +93,34 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const toolsOk = d.tools.every((t) => t.state === "ok");
   const installed = doInstall.data?.ok === true;
 
+  // The owner's 15:51 walk, 2026-10-13: start and finish are whole screens. While the house is made, a loading screen
+  // with nothing to change; then "You're good to go!" with Finish setup; then the tutorial on a screen of its own, with
+  // no setup step above it ("It needs to be an entirely new screen, no way to tweak the setup things").
+  if (doInstall.isPending) return (
+    <View style={s.screen}><View style={s.body}>
+      <Text style={s.h1}>Setting up your house…</Text>
+      <Text style={s.p}>This can take a few minutes. Keep this screen open; there is nothing to press.</Text>
+    </View></View>
+  );
+  if (d.setupDone) return (
+    <ScrollView style={s.screen}><View style={s.body}>
+      <TutorialView s={s} theme={theme} compact={layout.compact} navigation={navigation} />
+    </View></ScrollView>
+  );
+  if (installed) return (
+    <ScrollView style={s.screen}><View style={s.body}>
+      <Text style={s.h1}>You're good to go!</Text>
+      {doInstall.data?.steps.map((x) => <Text key={x} style={s.muted}>✓ {x}</Text>)}
+      <Text style={s.p}>{label(doInstall.data?.firstDesk?.citizen ?? "")} has said hello in their workspace. Open it from the sidebar on the left.</Text>
+      <Text style={s.h2}>How your citizens run</Text>
+      <ModeChoice s={s} mode={d.mode} onPick={(m) => doMode.mutate({ mode: m })} busy={doMode.isPending} askable navigation={navigation} />
+      {doMode.data && !doMode.data.ok && <Text style={s.bad}>{doMode.data.message}</Text>}
+      {doMode.isError && <Text style={s.bad}>{String(doMode.error)}</Text>}
+      <Pressable accessibilityRole="button" style={[s.button, doFinish.isPending && s.locked]} disabled={doFinish.isPending} onPress={() => doFinish.mutate({})}><Text style={s.buttonText}>Finish setup</Text></Pressable>
+      {doFinish.isError && <Text style={s.bad}>{String(doFinish.error)}</Text>}
+    </View></ScrollView>
+  );
+
   return (
     <ScrollView style={s.screen}><View style={s.body}>
       <Text style={s.h1}>Set up your Agentic Pockets</Text>
@@ -228,25 +256,6 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         {doInstall.isError && <Text style={s.bad}>Setup stopped: {String(doInstall.error)}. Press the button again to go on.</Text>}
       </>}
 
-      {installed && !d.setupDone && <>
-        <Text style={s.h2}>Your house is ready</Text>
-        {doInstall.data?.steps.map((x) => <Text key={x} style={s.muted}>✓ {x}</Text>)}
-        <Text style={s.p}>{label(doInstall.data?.firstDesk?.citizen ?? "")} has said hello in their workspace. Open it from the sidebar on the left.</Text>
-        <Text style={s.h2}>How your citizens run</Text>
-        <ModeChoice s={s} mode={d.mode} onPick={(m) => doMode.mutate({ mode: m })} busy={doMode.isPending} askable navigation={navigation} />
-        {doMode.data && !doMode.data.ok && <Text style={s.bad}>{doMode.data.message}</Text>}
-        {doMode.isError && <Text style={s.bad}>{String(doMode.error)}</Text>}
-        <Pressable accessibilityRole="button" style={s.button} onPress={() => doFinish.mutate({})}><Text style={s.buttonText}>Finish setup</Text></Pressable>
-        {doFinish.isError && <Text style={s.bad}>{String(doFinish.error)}</Text>}
-      </>}
-      {d.setupDone && <Text style={s.good}>Setup is finished. Your citizens live in the sidebar. Go to them through their workspace any time.</Text>}
-      {d.setupDone && <TutorialView s={s} theme={theme} compact={layout.compact} navigation={navigation} />}
-      {d.setupDone && <>
-        <Text style={s.h2}>How your citizens run</Text>
-        <ModeChoice s={s} mode={d.mode} onPick={(m) => doMode.mutate({ mode: m })} busy={doMode.isPending} askable navigation={navigation} />
-        {doMode.data && !doMode.data.ok && <Text style={s.bad}>{doMode.data.message}</Text>}
-        {doMode.isError && <Text style={s.bad}>{String(doMode.error)}</Text>}
-      </>}
     </View></ScrollView>
   );
 }
