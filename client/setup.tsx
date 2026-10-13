@@ -10,6 +10,7 @@ import { DEFAULT_MODE, type Mode } from "../shared/mode";
 import { ModeChoice } from "./mode";
 import { CAFE } from "../shared/cafe";
 import { LeftAlone, Welcome } from "./welcome";
+import { askToPoint } from "../shared/pointer";
 import { TutorialView } from "./tutorial";
 import { PACKS, emptyPick, toggle, view, type Pick } from "../shared/picker";
 import { openExternal } from "./web";
@@ -72,8 +73,8 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const welcome = useQuery({ queryKey: ["setup.welcome.read"], queryFn: () => readWelcome({}) });
   const dismiss = useMutation({ mutationFn: useRpc(welcomeDismissRpc), onSuccess: () => welcome.refetch() });
   const [left, setLeft] = useState(false);
-  if (left) return <LeftAlone s={s} />;
-  if (welcome.data?.seen === false) return <Welcome s={s} onGo={() => dismiss.mutate({})} onLeave={() => { setLeft(true); dismiss.mutate({}); }} />;
+  if (left) return <LeftAlone s={s} compact={layout.compact} />;
+  if (welcome.data?.seen === false) return <Welcome s={s} onGo={() => dismiss.mutate({})} onLeave={() => { setLeft(true); askToPoint(); dismiss.mutate({}); }} />;
 
   const d = st.data;
   if (!d) return <View style={s.screen}><View style={s.body}><Text style={s.muted}>{st.isError ? `Setup could not read this computer: ${String(st.error)}` : "Looking at this computer…"}</Text></View></View>;
