@@ -24,6 +24,8 @@ export interface Ops {
   // Each named Claude provider gets Node's folder at the front of its PATH, when Paseo's own PATH lacks it: the folder, or null.
   pinNode(ids: string[]): Promise<string | null>;
   installGitPlugin(source: string, ref?: string): Promise<void>;
+  // The open desk of the pocket at cwd (a record labelled role=desk, not archived), or null.
+  deskOf(cwd: string): Promise<string | null>;
   hasPlugin(id: string): Promise<boolean>;
   welcome(agentId: string, citizen: string): Promise<void>;
   openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
@@ -257,11 +259,14 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   }
   const first = input.citizens.includes("Ultron") ? "Ultron" : input.citizens[0];
   const provider = desks[first].provider;
-  const desk = await deps.ops.openDesk({ workspaceId: spaces[first], cwd: path.join(input.root, "Pockets", first), provider, model: desks[first].model,
+  // One desk per citizen: a run after an earlier one (a second press on a slow seat, the owner's 15:51 walk) keeps it.
+  const cwd = path.join(input.root, "Pockets", first);
+  const open = await deps.ops.deskOf(cwd);
+  const desk = open ? { agentId: open } : await deps.ops.openDesk({ workspaceId: spaces[first], cwd, provider, model: desks[first].model,
     title: `${first} — desk`, labels: { role: "desk" }, firstLine: SETUP_LINE });
-  steps.push(`Opened ${first}'s desk.`);
+  steps.push(open ? `${first}'s desk was already open.` : `Opened ${first}'s desk.`);
   // The welcome row at the top of the first desk's chat; a chat works without it, so a failure is only skipped.
-  if ((input.welcome ?? DESK_WELCOME_ON) && desk.agentId) await deps.ops.welcome(desk.agentId, first).catch(() => {});
+  if (!open && (input.welcome ?? DESK_WELCOME_ON) && desk.agentId) await deps.ops.welcome(desk.agentId, first).catch(() => {});
 
   // The house record (ticket 004 Q4): what this house has, read by every citizen and by the plugin's screens.
   const recFile = path.join(input.root, "house.json");

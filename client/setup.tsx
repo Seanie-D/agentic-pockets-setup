@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { claudeSignInRpc, claudeStatusRpc, connectRpc, finishRpc, installRpc, installToolsRpc, modeSetRpc, profileSignInRpc, profileStatusRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
 import { DEFAULT_MODE, type Mode } from "../shared/mode";
+import { untilDone } from "../shared/job";
 import { ModeChoice } from "./mode";
 import { CAFE } from "../shared/cafe";
 import { LeftAlone, Welcome } from "./welcome";
@@ -45,9 +46,10 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
 
   const readStatus = useRpc(status);
   const st = useQuery({ queryKey: ["setup.status"], queryFn: () => readStatus({}) });
-  const doTools = useMutation({ mutationFn: useRpc(installToolsRpc), onSuccess: () => st.refetch() });
-  const doConnect = useMutation({ mutationFn: useRpc(connectRpc), onSuccess: () => st.refetch() });
-  const doInstall = useMutation({ mutationFn: useRpc(installRpc), onSuccess: () => st.refetch() });
+  // A long step answers "still working" and is asked again until it is done (shared/job.ts): one press, one run.
+  const doTools = useMutation({ mutationFn: untilDone(useRpc(installToolsRpc)), onSuccess: () => st.refetch() });
+  const doConnect = useMutation({ mutationFn: untilDone(useRpc(connectRpc)), onSuccess: () => st.refetch() });
+  const doInstall = useMutation({ mutationFn: untilDone(useRpc(installRpc)), onSuccess: () => st.refetch() });
   const doFinish = useMutation({ mutationFn: useRpc(finishRpc), onSuccess: () => st.refetch() });
   const [code, setCode] = useState("");
   const [userName, setUserName] = useState("");
@@ -107,6 +109,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
       ))}
       {doTools.data?.tools.filter((t) => t.message).map((t) => <Text key={`m-${t.name}`} style={s.bad}>{t.name}: {t.message}</Text>)}
       {doTools.isError && <Text style={s.bad}>{String(doTools.error)}</Text>}
+      {doTools.data?.failed && <Text style={s.bad}>{doTools.data.failed}</Text>}
       {!toolsOk && <View style={s.row}>
         <Pressable accessibilityRole="button" style={[s.button, doTools.isPending && s.locked]} disabled={doTools.isPending} onPress={() => doTools.mutate({})}>
           <Text style={s.buttonText}>{doTools.isPending ? "Installing… this can take a few minutes" : "Install or update"}</Text>

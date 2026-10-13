@@ -124,6 +124,10 @@ export function ops(paseo: PaseoApi): Ops {
       if (r.status !== 0) throw new Error(`Paseo has Node's folder, but did not reload; quit and reopen Paseo`);
       return path.dirname(node!);
     },
+    async deskOf(cwd) {
+      const desk = discussDeps(paseo).records().find((r) => path.resolve(String(r.cwd ?? "")) === path.resolve(cwd) && !r.archivedAt && r.labels?.role === "desk");
+      return desk?.id ? String(desk.id) : null;
+    },
     async openDesk(o) {
       const w = handles.get(o.workspaceId);
       if (!w) throw new Error("the workspace was not made in this run");

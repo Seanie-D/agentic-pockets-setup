@@ -17,7 +17,7 @@ function upstream() {
   for (const n of ["Ultron", "Jarvis", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
   return u;
 }
-function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[]; pin?: () => Promise<string | null>; pinNode?: (ids: string[]) => Promise<string | null>; release?: object } = {}) {
+function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[]; pin?: () => Promise<string | null>; pinNode?: (ids: string[]) => Promise<string | null>; deskOf?: (cwd: string) => Promise<string | null>; release?: object } = {}) {
   const up = upstream();
   if (opts.release) fs.writeFileSync(path.join(up, "RELEASE.json"), JSON.stringify(opts.release));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-")); const root = path.join(home, "agentic-pockets");
@@ -43,6 +43,7 @@ function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean;
       addProvider: async (id, configDir) => { log.push(`provider ${id} ${configDir}`); },
       pinClaude: opts.pin ?? (async () => null),
       pinNode: opts.pinNode ?? (async () => null),
+      deskOf: opts.deskOf ?? (async () => null),
       installGitPlugin: async (source, ref) => { log.push(`gitplugin ${source}${ref ? ` @${ref}` : ""}`); if (source.includes("paseo-cafe") ? opts.cafeFails : opts.chatFails) throw new Error("no paseo command"); },
       hasPlugin: async (id) => (opts.installed ?? []).includes(id),
       welcome: async (agentId, citizen) => { log.push(`welcome ${agentId} ${citizen}`); },
@@ -394,6 +395,17 @@ test("setup shows the house's Claude providers where Node is, and why it could n
   const bad = world({ pinNode: async () => { throw new Error("config.patch refused"); } });
   const r2 = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: bad.root, home: bad.home }, bad.deps);
   assert.ok(r2.steps.includes("Could not show your citizens where Node is: config.patch refused."), r2.steps.join("\n"));
+});
+
+// The owner's 15:51 walk, 2026-10-13 (Windows): a second install run opened a second Ultron desk. A citizen that already
+// has a desk keeps it; setup opens none beside it.
+test("a run after a desk is already open opens no second desk", async () => {
+  const w = world({ deskOf: async (cwd: string) => (cwd.endsWith("Ultron") ? "agent-ultron-1" : null) });
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Ultron", "Verro"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.equal(w.log.filter((l) => l.startsWith("desk ")).length, 0, w.log.join("\n"));
+  assert.deepEqual(r.firstDesk, { citizen: "Ultron", agentId: "agent-ultron-1" });
+  assert.ok(r.steps.includes("Ultron's desk was already open."), r.steps.join("\n"));
 });
 
 // The update system, ticket 06: setup changes only through the house's offer, so the Cafe never updates it.

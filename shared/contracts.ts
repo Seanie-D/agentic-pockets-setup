@@ -7,7 +7,8 @@ const Tool = z.object({ name: z.string(), state: z.enum(["ok", "old", "missing"]
 const Installed = Tool.extend({ action: z.enum(["kept", "installed", "updated", "not done"]), message: z.string().optional() });
 const Extra = z.object({ id: z.string(), kind: z.enum(["hook", "skill", "agent", "command", "plugin", "mcp", "instructions", "paseo"]), name: z.string(), where: z.string(),
   switchable: z.boolean(), file: z.string().optional() });
-const Result = z.object({ ok: z.boolean(), message: z.string(), steps: z.array(z.string()) });
+// running: the step is still at work (shared/job.ts); the screen calls again, and the same job answers.
+const Result = z.object({ ok: z.boolean(), message: z.string(), steps: z.array(z.string()), running: z.boolean().optional() });
 
 export const status = defineRpc({
   name: "setup.status",
@@ -15,7 +16,7 @@ export const status = defineRpc({
   output: z.object({ tools: z.array(Tool), extras: z.array(Extra), root: z.string(), connected: z.boolean(),
     packs: z.array(z.object({ name: z.string(), hello: z.string() })), accounts: z.array(z.string()), setupDone: z.boolean(), mode: z.enum(["on-demand", "always-on"]), cafe: z.boolean() }),
 });
-export const installToolsRpc = defineRpc({ name: "setup.tools.install", input: z.object({}), output: z.object({ tools: z.array(Installed) }) });
+export const installToolsRpc = defineRpc({ name: "setup.tools.install", input: z.object({}), output: z.object({ tools: z.array(Installed), running: z.boolean().optional(), failed: z.string().optional() }) });
 export const connectRpc = defineRpc({ name: "setup.connect", input: z.object({ code: z.string().min(8) }), output: Result });
 export const installRpc = defineRpc({
   name: "setup.install",

@@ -13,12 +13,23 @@ import { markSeen, readTutorial, realProbe, stateTicks } from "./server/tutorial
 import { rewardPass } from "./server/reward";
 import { askHelp, readGlossary } from "./server/help";
 import { helpAskRpc, helpGlossaryRpc } from "./shared/contracts";
+import { joinable } from "./shared/job";
 
 // The house goes in the user's home folder, beside anything they already have (ticket 004 Q7: earlier projects untouched).
 const ROOT = path.join(os.homedir(), "agentic-pockets");
 const record = () => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, "house.json"), "utf8")); } catch { return {}; } };
 
+// Paseo gives a plugin call 30 seconds; installing tools, connecting and installing the house can take longer on a slow
+// Windows seat (the owner's 15:51 walk, 2026-10-13: two installs, two Ultron desks). Each runs as one joinable job.
+const WAIT_MS = 20_000;
+const BUSY = { ok: false, message: "Still working…", steps: [] as string[], running: true };
+// A job's own failure is an answer, so the screen's repeat calls (shared/job.ts untilDone) never start a second run.
+const failed = (e: unknown) => ({ ok: false, message: `Setup stopped: ${String((e as Error)?.message ?? e).slice(0, 300)}`, steps: [] as string[] });
+
 export default function contribute(server: PluginServerContext) {
+  const toolsJob = joinable<{ tools: ReturnType<typeof installTools>; running?: boolean; failed?: string }>(WAIT_MS);
+  const connectJob = joinable<Awaited<ReturnType<typeof connect>> & { running?: boolean }>(WAIT_MS);
+  const installJob = joinable<Awaited<ReturnType<typeof install>> & { running?: boolean }>(WAIT_MS);
   // The reward: once the tutorial is complete, the lead citizen is asked to draw it, and its drawing is shown in its chat.
   // Ticks and drawings land in a citizen's turn, so each turn's end (and each opening of the tutorial) runs the pass.
   let busy = false;
@@ -44,8 +55,8 @@ export default function contribute(server: PluginServerContext) {
   });
   server.handle(tutorialSeenRpc, async ({ id }) => { markSeen(ROOT, id); return { ok: true }; });
   server.handle(tutorialDiscussRpc, async ({ itemId }, { paseo }) => discuss(ROOT, itemId, discussDeps(paseo)));
-  server.handle(installToolsRpc, async () => ({ tools: installTools(exec, process.platform) }));
-  server.handle(connectRpc, async ({ code }, { paseo }) => connect({ code, root: ROOT, home: os.homedir() }, deps(paseo)));
+  server.handle(installToolsRpc, async () => toolsJob(async () => { try { return { tools: installTools(exec, process.platform) }; } catch (e) { return { tools: [], failed: String((e as Error)?.message ?? e).slice(0, 300) }; } }, { tools: [], running: true }));
+  server.handle(connectRpc, async ({ code }, { paseo }) => connectJob(() => connect({ code, root: ROOT, home: os.homedir() }, deps(paseo)).catch(failed), BUSY));
   server.handle(profileStatusRpc, async () => ({ signedIn: signedIn(exec, os.homedir()) }));
   server.handle(profileSignInRpc, async () => startSignIn(profileDir(os.homedir())));
   server.handle(claudeStatusRpc, async () => ({ signedIn: signedInTo(exec, null) }));
@@ -56,7 +67,7 @@ export default function contribute(server: PluginServerContext) {
     // Claude must be signed in first, the user's own or the clean profile's: a signed-out one greets the user with "Not logged in".
     if (!cleanProfile && !signedInTo(exec, null)) return { ok: false, message: "Sign in to Claude first: step 1, after the tools.", steps: [] };
     if (cleanProfile && !signedIn(exec, os.homedir())) return { ok: false, message: "Sign in to Claude for your house first, or switch the clean profile off.", steps: [] };
-    return install({ paseoHome: process.env.PASEO_HOME, code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, cleanProfile, mode, cafe, root: ROOT, home: os.homedir() }, deps(paseo));
+    return installJob(() => install({ paseoHome: process.env.PASEO_HOME, code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, cleanProfile, mode, cafe, root: ROOT, home: os.homedir() }, deps(paseo)).catch(failed), BUSY);
   });
   server.handle(finishRpc, async () => {
     const rec = record(); fs.writeFileSync(path.join(ROOT, "house.json"), JSON.stringify({ ...rec, setupDone: true, updatedAt: new Date().toISOString() }, null, 2) + "\n");
