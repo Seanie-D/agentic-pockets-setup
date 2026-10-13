@@ -365,3 +365,13 @@ test("Beautiful Chat: when it cannot be added, setup goes on and says where to a
   assert.equal(r.ok, true);
   assert.ok(r.steps.some((x) => x.startsWith("Setup could not add Beautiful Chat") && x.includes("Settings, Plugins") && x.includes("git:https://github.com/ABorakati/beautiful-chat.git")), r.steps.join("\n"));
 });
+
+test("one project: when Paseo will not make the house project, each citizen keeps its own project and wears its face", async () => {
+  const w = world();
+  w.deps.ops.houseProject = async () => { throw new Error("no project"); };
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.ok(w.log.some((l) => l.startsWith("workspace Ultron") && l.endsWith(" undefined")) || w.log.some((l) => l.startsWith("workspace Verro") && l.endsWith(" undefined")));
+  assert.ok(w.log.includes("icon prj_Verro png-Verro"), w.log.filter((l) => l.startsWith("icon")).join(","));
+  assert.ok(r.steps.includes("Made a Paseo workspace for each citizen."));
+});

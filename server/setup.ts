@@ -211,8 +211,11 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   const projectId = await deps.ops.houseProject(input.root, HOUSE_PROJECT).catch(() => null);
   const spaces: Record<string, string> = {};
   for (const n of input.citizens) {
-    const w = await deps.ops.createWorkspace({ dir: path.join(input.root, "Pockets", n), title: n, ...(projectId ? { projectId } : {}) });
+    const dir = path.join(input.root, "Pockets", n);
+    const w = await deps.ops.createWorkspace({ dir, title: n, ...(projectId ? { projectId } : {}) });
     spaces[n] = w.workspaceId;
+    // No house project (Paseo would not make one): each citizen has its own, so each wears its own face, as before.
+    if (!projectId && w.projectId && fs.existsSync(path.join(dir, "face.png"))) await deps.ops.setIcon(w.projectId, path.join(dir, "face.png")).catch(() => {});
   }
   const icon = path.join(upstream, "house.png");
   if (projectId && fs.existsSync(icon)) await deps.ops.setIcon(projectId, icon).catch(() => { /* an icon is nice, not needed */ });
