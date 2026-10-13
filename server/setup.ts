@@ -24,19 +24,23 @@ export interface Ops {
   // Each named Claude provider gets Node's folder at the front of its PATH, when Paseo's own PATH lacks it: the folder, or null.
   pinNode(ids: string[]): Promise<string | null>;
   installGitPlugin(source: string, ref?: string): Promise<void>;
+  // A Git plugin fetched and built by setup itself, with setup's PATH, then added as a folder (Paseo builds no folder plugin).
+  buildPlugin(id: string, source: string, ref: string): Promise<void>;
   // The open desk of the pocket at cwd (a record labelled role=desk, not archived), or null.
   deskOf(cwd: string): Promise<string | null>;
   hasPlugin(id: string): Promise<boolean>;
   welcome(agentId: string, citizen: string): Promise<void>;
-  openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
+  openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; mode?: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
 }
-export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; doorman: string; now: () => string; retryMs?: number }
+export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; doorman: string; now: () => string }
 export interface SetupInput { paseoHome?: string; code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean; welcome?: boolean; mode?: Mode; cafe?: boolean }
 export interface SetupResult { ok: boolean; message: string; steps: string[]; firstDesk?: { citizen: string; agentId: string | null } }
 
 // The first line of the first desk (ticket 004 Q11): setup is not finished, so the citizen says hello, sends the user
 // back to finish, and says they can ask it anything at any time.
-export const SETUP_LINE = "[SETUP] Setup has just started and is not finished yet. Say hello in one or two plain sentences, tell the user they can ask you anything at any time, and send them back to the Agentic Pockets setup screen to finish it.";
+// Auto is Claude's own mode (any Claude account: claude, claude-house, …); Codex and OpenCode keep their default.
+export const deskMode = (provider: string): string | undefined => provider.startsWith("claude") ? "auto" : undefined;
+export const setupLine = (houseFile: string) => `[SETUP] Setup has just started and is not finished yet. Say hello in one or two plain sentences, tell the user they can ask you anything at any time, and send them back to the Agentic Pockets setup screen to finish it. Setup finishes later, on that screen: from then on, before you say anything about setup, read \`setupDone\` in ${houseFile}. When it is true, setup is done.`;
 const DEFAULT_MODEL: Record<string, string> = { claude: "claude-opus-5-5", "claude-house": "claude-opus-5-5" };
 const HOUSE_MANAGER = "Jarvis";
 
@@ -158,6 +162,11 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   const missing = input.citizens.find((n) => !fs.existsSync(path.join(upstream, "Pockets", n)));
   if (missing) return fail(`${missing} is not in this release of the house.`);   // before anything is placed
   for (const rel of ["Commons", path.join("Pockets", "_Template")]) if (fs.existsSync(path.join(upstream, rel))) put(rel);
+  // The release's house folders (Deliverables, Inbox), as its RELEASE.json names them (house:<folder>), placed like the
+  // Commons; a folder the release names as no piece stays out (the owner's 16:43 re-walk).
+  let named: string[] = [];
+  try { named = Object.keys(JSON.parse(fs.readFileSync(path.join(upstream, "RELEASE.json"), "utf8")).pieces ?? {}); } catch { /* an older release */ }
+  for (const id of named) if (/^house:[^/\\]+$/.test(id) && fs.statSync(path.join(upstream, id.slice(6)), { throwIfNoEntry: false })?.isDirectory()) put(id.slice(6));
   for (const n of input.citizens) put(path.join("Pockets", n));
   steps.push(`Placed ${input.citizens.join(", ")} in ${input.root}.`);
   // How the citizens run (Q11): on demand unless the user picked always on; a run that names no mode keeps the house's.
@@ -190,11 +199,20 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   if (await deps.ops.hasPlugin(BEAUTIFUL_CHAT.id).catch(() => false)) steps.push("Beautiful Chat is already in Paseo; setup kept yours.");
   else {
     // Twice, and a failure's reason in setup's own plugin log too (the owner's 15:51 walk: the Mac never got it, and the
-    // reason was on the screen only).
-    const once = () => deps.ops.installGitPlugin(BEAUTIFUL_CHAT.source, BEAUTIFUL_CHAT.ref);
-    try { await once().catch(async (e) => { console.error(`setup: Beautiful Chat install failed, trying again: ${String((e as Error)?.message ?? e).slice(0, 300)}`); await new Promise((r) => setTimeout(r, deps.retryMs ?? 3000)); return once(); });
-      steps.push("Added Beautiful Chat to Paseo: a cleaner look for every chat."); }
-    catch (e) { console.error(`setup: Beautiful Chat install failed twice: ${String((e as Error)?.message ?? e).slice(0, 300)}`); steps.push(`Setup could not add Beautiful Chat (${String((e as Error)?.message ?? e).slice(0, 160)}). Your house works without it. You can add it in Paseo: Settings, Plugins, Plugin source: ${BEAUTIFUL_CHAT.source}`); }
+    // reason was on the screen only). Paseo builds a Git plugin with its own PATH, which on a Mac opened from the Dock has
+    // no npm (the 16:43 re-walk), so the second try is setup's own build of the same commit.
+    const why = (e: unknown) => String((e as Error)?.message ?? e);
+    const install = async () => {
+      try { await deps.ops.installGitPlugin(BEAUTIFUL_CHAT.source, BEAUTIFUL_CHAT.ref); return; }
+      catch (e) {
+        const first = why(e);
+        console.error(`setup: Beautiful Chat install failed, building it here instead: ${first.slice(0, 300)}`);
+        try { await deps.ops.buildPlugin(BEAUTIFUL_CHAT.id, BEAUTIFUL_CHAT.source, BEAUTIFUL_CHAT.ref); }
+        catch (e2) { throw new Error(`${first.slice(0, 160)}; then setup's own try: ${why(e2).slice(0, 160)}`); }
+      }
+    };
+    try { await install(); steps.push("Added Beautiful Chat to Paseo: a cleaner look for every chat."); }
+    catch (e) { console.error(`setup: Beautiful Chat install failed twice: ${why(e).slice(0, 300)}`); steps.push(`Setup could not add Beautiful Chat (${why(e).slice(0, 340)}). Your house works without it. You can add it in Paseo: Settings, Plugins, Plugin source: ${BEAUTIFUL_CHAT.source}`); }
   }
 
   // The Paseo Cafe, only when the user ticked it; the house works without it. With the Cafe in Paseo, setup and Beautiful
@@ -256,19 +274,21 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
     if (w.projectId && fs.existsSync(face)) await deps.ops.setIcon(w.projectId, face).catch(() => { /* a face is nice, not needed */ });
   }
   steps.push("Made a Paseo workspace for each citizen.");
-  // Each citizen's desk row: what the house plugin opens a desk with (its Mailman and clock-in).
-  const desks: Record<string, { provider: string; model: string; workspaceId: string }> = {};
+  // Each citizen's desk row: what the house plugin opens a desk with (its Mailman and clock-in). Every desk in Auto, as
+  // the first desk is (the owner's 16:43 re-walk).
+  const desks: Record<string, { provider: string; model: string; workspaceId: string; mode?: string }> = {};
   for (const n of input.citizens) {
     const provider = input.accounts[n] ?? "claude";
-    desks[n] = { provider, model: input.models?.[n] ?? DEFAULT_MODEL[provider] ?? "default", workspaceId: spaces[n] };
+    const mode = deskMode(provider);
+    desks[n] = { provider, model: input.models?.[n] ?? DEFAULT_MODEL[provider] ?? "default", workspaceId: spaces[n], ...(mode ? { mode } : {}) };
   }
   const first = input.citizens.includes("Ultron") ? "Ultron" : input.citizens[0];
   const provider = desks[first].provider;
   // One desk per citizen: a run after an earlier one (a second press on a slow seat, the owner's 15:51 walk) keeps it.
   const cwd = path.join(input.root, "Pockets", first);
   const open = await deps.ops.deskOf(cwd);
-  const desk = open ? { agentId: open } : await deps.ops.openDesk({ workspaceId: spaces[first], cwd, provider, model: desks[first].model,
-    title: `${first} — desk`, labels: { role: "desk" }, firstLine: SETUP_LINE });
+  const desk = open ? { agentId: open } : await deps.ops.openDesk({ workspaceId: spaces[first], cwd, provider, model: desks[first].model, mode: desks[first].mode,
+    title: `${first} — desk`, labels: { role: "desk" }, firstLine: setupLine(path.join(input.root, "house.json")) });
   steps.push(open ? `${first}'s desk was already open.` : `Opened ${first}'s desk.`);
   // The welcome row at the top of the first desk's chat; a chat works without it, so a failure is only skipped.
   if (!open && (input.welcome ?? DESK_WELCOME_ON) && desk.agentId) await deps.ops.welcome(desk.agentId, first).catch(() => {});

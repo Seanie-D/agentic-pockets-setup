@@ -45,11 +45,12 @@ function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean;
       pinNode: opts.pinNode ?? (async () => null),
       deskOf: opts.deskOf ?? (async () => null),
       installGitPlugin: async (source, ref) => { log.push(`gitplugin ${source}${ref ? ` @${ref}` : ""}`); if (!source.includes("paseo-cafe") && opts.chatFailsOnce && !log.some((l) => l === "chat failed once")) { log.push("chat failed once"); throw new Error("clone timed out"); } if (source.includes("paseo-cafe") ? opts.cafeFails : opts.chatFails) throw new Error("no paseo command"); },
+      buildPlugin: async (id, source, ref) => { log.push(`builtplugin ${id} ${source} @${ref}`); if (opts.chatFails) throw new Error("no npm here either"); },
       hasPlugin: async (id) => (opts.installed ?? []).includes(id),
       welcome: async (agentId, citizen) => { log.push(`welcome ${agentId} ${citizen}`); },
       openDesk: async (o) => { log.push(`desk ${o.title} ${o.provider}/${o.model} ${JSON.stringify(o.labels)} cwd=${o.cwd}`); return { agentId: "agent-1" }; },
     },
-    hostname: () => "Nicks-MacBook", retryMs: 0, doorman: "https://doorman.example", now: () => "2026-10-14T13:00:00.000Z",
+    hostname: () => "Nicks-MacBook", doorman: "https://doorman.example", now: () => "2026-10-14T13:00:00.000Z",
   };
   return { deps, home, root, log, posts };
 }
@@ -114,15 +115,17 @@ test("no name, no run: setup asks for it before anything is placed", async () =>
   assert.ok(!fs.existsSync(w.root));
 });
 
-test("the house record keeps each citizen's desk row (account, model, workspace), so the house plugin can open its desks", async () => {
+// Every desk in Auto, as the first desk is (Sean's re-walk, 2026-10-13 16:43 CDT: "I would love if every citizen could
+// start in Auto mode also on first start").
+test("the house record keeps each citizen's desk row (account, model, workspace, Auto mode), so the house plugin can open its desks", async () => {
   const w = world();
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Ultron", "Verro"], accounts: { Ultron: "claude", Verro: "claude" }, root: w.root, home: w.home }, w.deps);
   assert.equal(r.ok, true, r.message);
   const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
   assert.deepEqual(rec.desks, {
-    Ultron: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Ultron" },
-    Verro: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Verro" },
-    Jarvis: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Jarvis" },
+    Ultron: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Ultron", mode: "auto" },
+    Verro: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Verro", mode: "auto" },
+    Jarvis: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Jarvis", mode: "auto" },
   });
 });
 
@@ -364,6 +367,8 @@ test("Beautiful Chat: when it cannot be added, setup goes on and says where to a
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
   assert.equal(r.ok, true);
   assert.ok(r.steps.some((x) => x.startsWith("Setup could not add Beautiful Chat") && x.includes("Settings, Plugins") && x.includes("git:https://github.com/ABorakati/beautiful-chat.git")), r.steps.join("\n"));
+  // Both tries' reasons reach the step: Paseo's own, then setup's build (the review, 2026-10-13).
+  assert.ok(r.steps.some((x) => x.includes("no paseo command") && x.includes("no npm here either")), r.steps.join("\n"));
 });
 
 test("a citizen's Paseo workspace is titled with its display name: Miss Minutes, not MissMinutes", async () => {
@@ -409,11 +414,16 @@ test("a run after a desk is already open opens no second desk", async () => {
 });
 
 // The owner's 15:51 walk, 2026-10-13: the Mac never got Beautiful Chat. A failed install is tried once more.
-test("a Beautiful Chat install that fails once is tried again, and lands", async () => {
+// The Mac re-walk, 2026-10-13 16:43 CDT: Paseo builds a Git plugin with its own PATH, which on the Mac lacks npm, so a
+// second Git try fails the same way. The second try is setup's own: fetch the same commit, build it with setup's PATH,
+// and add the folder (Paseo builds no folder plugin).
+test("a Beautiful Chat Git install that fails is tried again as a folder setup builds itself, at the same commit, and lands", async () => {
   const w = world({ chatFailsOnce: true });
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
   assert.ok(r.steps.includes("Added Beautiful Chat to Paseo: a cleaner look for every chat."), r.steps.join("\n"));
-  assert.equal(w.log.filter((l) => l.includes("beautiful-chat")).length, 2, "two tries");
+  assert.deepEqual(w.log.filter((l) => l.includes("beautiful-chat")), [
+    "gitplugin git:https://github.com/ABorakati/beautiful-chat.git @42b61d8301b5400a67821bbbfcf99fa8b681dc37",
+    "builtplugin beautiful-chat git:https://github.com/ABorakati/beautiful-chat.git @42b61d8301b5400a67821bbbfcf99fa8b681dc37"]);
 });
 
 // The update system, ticket 06: setup changes only through the house's offer, so the Cafe never updates it.
@@ -458,4 +468,51 @@ test("the house record names its base release, and each piece's hash as released
   setMode(w.root, "always-on");
   const after = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
   assert.equal(after.release.pieces["pack:Verro"].placed, pieceHash(w.root, "pack:Verro"));
+});
+
+// Sean's re-walk, 2026-10-13 16:43 CDT: the house folders of a release (Deliverables, Inbox) were never placed, so the
+// update system read them as new in every house. Setup places them like the Commons; a folder the user has is kept.
+test("the release's house folders, Deliverables and Inbox, are placed and recorded as placed; a folder the user has is kept", async () => {
+  const release = { format: 1, id: "r1base", pieces: { "house:Deliverables": { hash: "h-del", depends: [] }, "house:Inbox": { hash: "h-in", depends: [] } } };
+  const w = world({ release });
+  const clone = w.deps.exec;
+  w.deps.exec = (cmd, args, o) => {
+    const r = clone(cmd, args, o);
+    if (cmd === "git" && args[0] === "clone") for (const d of ["Deliverables", "Inbox", "docs"]) { const t = path.join(args[args.length - 1], d); fs.mkdirSync(t, { recursive: true }); fs.writeFileSync(path.join(t, "README.md"), `${d} for {{USER_NAME}}`); }
+    return r;
+  };
+  fs.mkdirSync(path.join(w.root, "Inbox"), { recursive: true }); fs.writeFileSync(path.join(w.root, "Inbox", "mine.md"), "the user's own");
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.equal(fs.readFileSync(path.join(w.root, "Deliverables", "README.md"), "utf8"), "Deliverables for Nick");
+  assert.deepEqual(fs.readdirSync(path.join(w.root, "Inbox")), ["mine.md"], "the user's own folder is untouched");
+  assert.equal(fs.existsSync(path.join(w.root, "docs")), false, "a folder the release names as no piece stays out");
+  const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.equal(rec.release.pieces["house:Deliverables"].placed, pieceHash(w.root, "house:Deliverables"));
+});
+
+// Sean's re-walk, 2026-10-13 16:43 CDT: every citizen still said setup was not finished after it was. The first desk's
+// line says where to read whether setup is done, so a later answer is from the house record, not from this line.
+test("the first desk's line names house.json and its setupDone, so the citizen checks before it says setup is unfinished", async () => {
+  const w = world();
+  let line = "";
+  const open = w.deps.ops.openDesk;
+  w.deps.ops.openDesk = async (o) => { line = o.firstLine; return open(o); };
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.ok(line.includes(path.join(w.root, "house.json")) && line.includes("setupDone"), line);
+});
+
+// Auto is Claude's mode alone: Codex and OpenCode have none of that name, so their desks keep their own default.
+test("Auto mode on a Claude account only: the first desk opens in it, and a Codex desk row names no mode", async () => {
+  const w = world();
+  let mode: string | undefined = "unset";
+  const open = w.deps.ops.openDesk;
+  w.deps.ops.openDesk = async (o) => { mode = o.mode; return open(o); };
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro", "Vision"], accounts: { Verro: "claude-house", Vision: "codex" }, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.equal(mode, "auto");
+  const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.equal(rec.desks.Verro.mode, "auto");
+  assert.equal("mode" in rec.desks.Vision, false);
 });

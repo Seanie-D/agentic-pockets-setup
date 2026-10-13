@@ -13,7 +13,7 @@ import { CAFE } from "../shared/cafe";
 import { LeftAlone, Welcome } from "./welcome";
 import { askToPoint } from "../shared/pointer";
 import { TutorialView } from "./tutorial";
-import { PACKS, emptyPick, toggle, view, type Pick } from "../shared/picker";
+import { PACKS, emptyPick, modeAfterSetup, toggle, view, type Pick } from "../shared/picker";
 import { openExternal } from "./web";
 import { HELP } from "../shared/help-links";
 import { Hello } from "./hello";
@@ -102,8 +102,10 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
       <Text style={s.p}>This can take a few minutes. Keep this screen open; there is nothing to press.</Text>
     </View></View>
   );
+  // The tutorial in the middle, with room for its two columns (the owner's Mac re-walk, 16:43: "not centred, sticks to
+  // the left, and scrolls very far"; a 680-wide body squeezed the page card into a tall strip).
   if (d.setupDone) return (
-    <ScrollView style={s.screen}><View style={s.body}>
+    <ScrollView style={s.screen}><View style={[s.body, { alignSelf: "center", width: "100%", maxWidth: 1040 }]}>
       <TutorialView s={s} theme={theme} compact={layout.compact} navigation={navigation} />
     </View></ScrollView>
   );
@@ -112,10 +114,12 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
       <Text style={s.h1}>You're good to go!</Text>
       {doInstall.data?.steps.map((x) => <Text key={x} style={s.muted}>✓ {x}</Text>)}
       <Text style={s.p}>{label(doInstall.data?.firstDesk?.citizen ?? "")} has said hello in their workspace. Open it from the sidebar on the left.</Text>
-      <Text style={s.h2}>How your citizens run</Text>
-      <ModeChoice s={s} mode={d.mode} onPick={(m) => doMode.mutate({ mode: m })} busy={doMode.isPending} askable navigation={navigation} />
-      {doMode.data && !doMode.data.ok && <Text style={s.bad}>{doMode.data.message}</Text>}
-      {doMode.isError && <Text style={s.bad}>{String(doMode.error)}</Text>}
+      {modeAfterSetup(pick) && <>
+        <Text style={s.h2}>How your citizens run</Text>
+        <ModeChoice s={s} mode={d.mode} onPick={(m) => doMode.mutate({ mode: m })} busy={doMode.isPending} askable navigation={navigation} />
+        {doMode.data && !doMode.data.ok && <Text style={s.bad}>{doMode.data.message}</Text>}
+        {doMode.isError && <Text style={s.bad}>{String(doMode.error)}</Text>}
+      </>}
       <Pressable accessibilityRole="button" style={[s.button, doFinish.isPending && s.locked]} disabled={doFinish.isPending} onPress={() => doFinish.mutate({})}><Text style={s.buttonText}>Finish setup</Text></Pressable>
       {doFinish.isError && <Text style={s.bad}>{String(doFinish.error)}</Text>}
     </View></ScrollView>
@@ -213,15 +217,16 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
 
         {d.extras.length > 0 && <>
           <Text style={s.h2}>6. Extras already on this computer</Text>
-          <Text style={s.muted}>These extras reach every project on this computer, your new house too. Keep them, or switch one off for your house only. Nothing is deleted, and your other projects keep them.</Text>
+          <Text style={s.muted}>These extras reach every project on this computer, your new house too. Untick one to switch it off for your house only. Nothing is deleted, and your other projects keep them.</Text>
           {d.extras.map((e) => {
             const off = extrasOff.includes(e.id);
             return (
               <View key={e.id} style={s.row}>
                 <Text style={s.p}>{e.kind}: {e.name}</Text>
                 {e.switchable ? (
-                  <Pressable accessibilityRole="switch" accessibilityState={{ checked: !off }} style={[s.quiet, off && s.picked]} onPress={() => setExtrasOff(off ? extrasOff.filter((x) => x !== e.id) : [...extrasOff, e.id])}>
-                    <Text style={s.quietText}>{off ? "Off for my house" : "Keep"}</Text>
+                  // A checkbox whose two states read plainly, as the Claude-profile choice (the owner's 16:43 re-walk).
+                  <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: !off }} style={[s.card, !off && s.picked]} onPress={() => setExtrasOff(off ? extrasOff.filter((x) => x !== e.id) : [...extrasOff, e.id])}>
+                    <Text style={s.p}>{off ? "☐" : "☑"}  Use in my house</Text>
                   </Pressable>
                 ) : <Text style={s.muted}>{e.kind === "paseo" ? "Set in Paseo for every project" : "Cannot be switched off for one project"}</Text>}
               </View>

@@ -24,3 +24,7 @@ export function view(s: Pick): { citizens: string[]; ultron: UltronState } {
   const order = (PACKS as readonly string[]).filter((p) => s.packs.includes(p));
   return { citizens: [...(ultron === "free-off" ? [] : [ORCHESTRATOR]), ...order.sort((a, b) => a.localeCompare(b))], ultron };
 }
+
+// The good-to-go screen offers how the citizens run again only for two or more citizens (Jarvis is not counted): with
+// one, it read as weird (the owner's Mac re-walk, 2026-10-13 16:43 CDT).
+export const modeAfterSetup = (s: Pick): boolean => view(s).citizens.length > 1;

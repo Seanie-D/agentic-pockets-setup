@@ -17,11 +17,14 @@ test("the welcome is unseen on a new computer, and seen for good once dismissed"
   assert.ok(fs.existsSync(path.join(home, ".agentic-pockets", "welcome.json")), "kept beside the house key, outside any house");
 });
 
-test("the sidebar item takes the screen over once: only while unseen, and only once per app session", () => {
-  assert.equal(takeOver({ seen: false, openedThisSession: false }), true);
-  assert.equal(takeOver({ seen: true, openedThisSession: false }), false, "dismissed or started: never again");
-  assert.equal(takeOver({ seen: false, openedThisSession: true }), false, "a reload does not reopen it");
-  assert.equal(takeOver({ seen: undefined, openedThisSession: false }), false, "still reading the flag: wait");
+test("the sidebar item takes the screen over once: only while unseen, and only once per start of the plugin", () => {
+  assert.equal(takeOver({ seen: false, server: "s1", openedFor: undefined }), true);
+  assert.equal(takeOver({ seen: true, server: "s1", openedFor: undefined }), false, "dismissed or started: never again");
+  assert.equal(takeOver({ seen: false, server: "s1", openedFor: "s1" }), false, "a reload does not reopen it");
+  assert.equal(takeOver({ seen: undefined, server: undefined, openedFor: undefined }), false, "still reading the flag: wait");
+  // The Mac re-walk, 2026-10-13 16:43 CDT: the welcome did not open on install. A mark kept in the app window outlives
+  // the plugin: removed and added again with Paseo left open, the new install found the old mark.
+  assert.equal(takeOver({ seen: false, server: "s2", openedFor: "s1" }), true, "the plugin added again: it opens");
 });
 
 test("the words are the owner's, verbatim", () => {

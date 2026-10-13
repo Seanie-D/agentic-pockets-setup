@@ -2,7 +2,7 @@
 // greys him out; going back to one unticks him and leaves him free.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { emptyPick, toggle, view } from "../shared/picker.ts";
+import { emptyPick, modeAfterSetup, toggle, view } from "../shared/picker.ts";
 
 test("one citizen: Ultron is free, and unticked", () => {
   const v = view(toggle(emptyPick(), "Verro"));
@@ -24,4 +24,12 @@ test("with one citizen, Ultron may be ticked by hand; a locked Ultron cannot be 
 });
 test("only the four offered packs and Ultron can be ticked", () => {
   assert.deepEqual(view(toggle(emptyPick(), "Butler")).citizens, []);
+});
+
+// Sean's Mac re-walk, 2026-10-13 16:43 CDT: "You're good to go!" with one citizen still showed "How your citizens run"
+// at the bottom, "which is weird". With one citizen the choice stays on its step; with two or more it is offered again.
+test("the good-to-go screen offers how the citizens run only for two or more citizens", () => {
+  assert.equal(modeAfterSetup(toggle(emptyPick(), "Verro")), false, "one citizen");
+  assert.equal(modeAfterSetup(toggle(toggle(emptyPick(), "Verro"), "Ultron")), true, "a citizen and Ultron by hand");
+  assert.equal(modeAfterSetup(toggle(toggle(emptyPick(), "Verro"), "Vision")), true, "two, and Ultron with them");
 });

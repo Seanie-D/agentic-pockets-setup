@@ -27,7 +27,7 @@ export const installRpc = defineRpc({
   output: Result.extend({ firstDesk: z.object({ citizen: z.string(), agentId: z.string().nullable() }).optional() }),
 });
 // The welcome take-over (ticket 009): whether this computer has seen it, and marking it seen.
-export const welcomeReadRpc = defineRpc({ name: "setup.welcome.read", input: z.object({}), output: z.object({ seen: z.boolean() }) });
+export const welcomeReadRpc = defineRpc({ name: "setup.welcome.read", input: z.object({}), output: z.object({ seen: z.boolean(), server: z.string() }) });
 export const welcomeDismissRpc = defineRpc({ name: "setup.welcome.dismiss", input: z.object({}), output: z.object({ seen: z.boolean() }) });
 // The tutorial (ticket 009): the house's checklist with each item's tick, the percent, the sidebar label, the reward.
 export const tutorialReadRpc = defineRpc({ name: "setup.tutorial.read", input: z.object({}), output: z.object({

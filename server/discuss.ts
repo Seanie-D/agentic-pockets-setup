@@ -7,7 +7,7 @@ import { leadOf, readTutorial } from "./tutorial.ts";
 import { MODES, type Mode } from "../shared/mode.ts";
 
 export interface AgentRecord { id: string; cwd?: string; labels?: Record<string, string>; archivedAt?: string | null }
-export interface DeskRow { provider: string; model: string; workspaceId: string }
+export interface DeskRow { provider: string; model: string; workspaceId: string; mode?: string }
 export interface DiscussDeps {
   records(): AgentRecord[];
   send(agentId: string, text: string): Promise<void>;

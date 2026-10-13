@@ -1,4 +1,5 @@
 // The real outside world for the setup run, inside Paseo: processes, the doorman, and Paseo itself.
+import { paseoError } from "./paseo-error.ts";
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -60,6 +61,14 @@ async function setProjectIcon(projectId: string, png: string): Promise<void> {
 }
 
 export function ops(paseo: PaseoApi): Ops {
+  async function addPlugin(id: string, dir: string) {
+    const { config } = await paseo.config.get();
+    const plugins = { ...((config as { plugins?: Record<string, unknown> }).plugins ?? {}), [id]: { source: "directory", path: dir, enabled: true } };
+    await paseo.config.patch({ plugins } as Parameters<PaseoApi["config"]["patch"]>[0]);
+    // Paseo keeps it, but starts it only at its next start or on a reload (proven 2026-10-12); the SDK has no reload,
+    // so the Paseo command does it where it is found (the Mac app ships it; see EXTRA_PATH).
+    return { running: exec("paseo", ["plugin", "reload", id]).status === 0 };
+  }
   const handles = new Map<string, Awaited<ReturnType<PaseoApi["workspaces"]["create"]>>>();
   return {
     async createWorkspace({ dir, title }) {
@@ -82,14 +91,7 @@ export function ops(paseo: PaseoApi): Ops {
       await paseo.config.patch({ providers } as Parameters<PaseoApi["config"]["patch"]>[0]);
     },
     // Paseo's own config, through the SDK: the plugin is one more directory source, enabled. No command line is needed.
-    async addPlugin(id, dir) {
-      const { config } = await paseo.config.get();
-      const plugins = { ...((config as { plugins?: Record<string, unknown> }).plugins ?? {}), [id]: { source: "directory", path: dir, enabled: true } };
-      await paseo.config.patch({ plugins } as Parameters<PaseoApi["config"]["patch"]>[0]);
-      // Paseo keeps it, but starts it only at its next start or on a reload (proven 2026-10-12); the SDK has no reload,
-      // so the Paseo command does it where it is found (the Mac app ships it; see EXTRA_PATH).
-      return { running: exec("paseo", ["plugin", "reload", id]).status === 0 };
-    },
+    addPlugin,
     // Whether Paseo already has a plugin of this id, from any source (the official directory, Git, a folder).
     async hasPlugin(id) {
       const { config } = await paseo.config.get();
@@ -99,7 +101,22 @@ export function ops(paseo: PaseoApi): Ops {
     // install call. No command found: the caller tells the user where to add it by hand.
     async installGitPlugin(source, ref) {
       const r = exec("paseo", ["plugin", "install", source, ...(ref ? ["--ref", ref] : []), "--json"]);
-      if (r.status !== 0) throw new Error((r.stderr || r.stdout).trim().split("\n").pop()?.slice(0, 160) || "the Paseo command was not found");
+      if (r.status !== 0) throw new Error(paseoError(r));
+    },
+    // The same commit, fetched and built here with setup's PATH (Homebrew's npm on the Mac), into setup's own folder, then
+    // added as a folder plugin, which Paseo does not build. Each failing step's own output is the reason.
+    async buildPlugin(id, source, ref) {
+      const dir = path.join(os.homedir(), ".agentic-pockets", "plugins", id);
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.mkdirSync(path.dirname(dir), { recursive: true });
+      const run = (what: string, cmd: string, args: string[], cwd?: string) => {
+        const r = exec(cmd, args, { cwd });
+        if (r.status !== 0) throw new Error(`${what}: ${`${r.stderr}\n${r.stdout}`.replace(/\s+/g, " ").trim().slice(-300) || `${cmd} was not found`}`);
+      };
+      run("could not fetch it", "git", ["clone", "--quiet", "--no-checkout", source.replace(/^git:/, ""), dir]);
+      run("could not fetch the reviewed commit", "git", ["-C", dir, "checkout", "--quiet", ref]);
+      run("could not build it", "npm", ["ci", "--include=dev", "--no-audit", "--no-fund"], dir);
+      await addPlugin(id, dir);
     },
     // Claude where setup finds it but Paseo, on its own PATH, does not (~/.local/bin on the Mac): Paseo gets the full path.
     async pinClaude() {
@@ -139,7 +156,7 @@ export function ops(paseo: PaseoApi): Ops {
     async openDesk(o) {
       const w = handles.get(o.workspaceId);
       if (!w) throw new Error("the workspace was not made in this run");
-      const a = await w.agents.create({ config: { provider: `${o.provider}/${o.model}`, modeId: "auto" }, title: o.title, labels: o.labels, prompt: o.firstLine });
+      const a = await w.agents.create({ config: { provider: `${o.provider}/${o.model}`, ...(o.mode ? { modeId: o.mode } : {}) }, title: o.title, labels: o.labels, prompt: o.firstLine });
       return { agentId: a.id };
     },
   };
@@ -161,7 +178,7 @@ export function discussDeps(paseo: PaseoApi): DiscussDeps {
     },
     async send(agentId, text) { await paseo.agents.ref(agentId).send(text); },
     async open(row, citizen, firstLine) {
-      const a = await paseo.workspaces.ref(row.workspaceId).agents.create({ config: { provider: `${row.provider}/${row.model}`, modeId: "auto" }, title: `${citizen} — desk`, labels: { role: "desk" }, prompt: firstLine });
+      const a = await paseo.workspaces.ref(row.workspaceId).agents.create({ config: { provider: `${row.provider}/${row.model}`, ...(row.mode ? { modeId: row.mode } : {}) }, title: `${citizen} — desk`, labels: { role: "desk" }, prompt: firstLine });
       return a.id;
     },
   };

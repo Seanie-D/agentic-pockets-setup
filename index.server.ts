@@ -21,6 +21,8 @@ const record = () => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, "
 
 // Paseo gives a plugin call 30 seconds; installing tools, connecting and installing the house can take longer on a slow
 // Windows seat (the owner's 15:51 walk, 2026-10-13: two installs, two Ultron desks). Each runs as one joinable job.
+// This start of the plugin's server: the welcome opens once per start, so a plugin added again opens it again.
+const SERVER_START = `${process.pid}-${Date.now()}`;
 const WAIT_MS = 20_000;
 const BUSY = { ok: false, message: "Still working…", steps: [] as string[], running: true };
 // A job's own failure is an answer, so the screen's repeat calls (shared/job.ts untilDone) never start a second run.
@@ -46,7 +48,7 @@ export default function contribute(server: PluginServerContext) {
       mode: record().mode === "always-on" ? "always-on" as const : "on-demand" as const,
       cafe: await paseo.config.get().then(({ config }) => !!(config as { plugins?: Record<string, unknown> }).plugins?.["paseo-cafe"]).catch(() => false) };
   });
-  server.handle(welcomeReadRpc, async () => ({ seen: welcomeSeen(os.homedir()) }));
+  server.handle(welcomeReadRpc, async () => ({ seen: welcomeSeen(os.homedir()), server: SERVER_START }));
   server.handle(welcomeDismissRpc, async () => { markWelcomeSeen(os.homedir(), new Date().toISOString()); return { seen: true }; });
   server.handle(tutorialReadRpc, async (_i, { paseo }) => {
     stateTicks(ROOT, realProbe(ROOT), new Date().toISOString());   // the setup items, from the state as the tutorial opens

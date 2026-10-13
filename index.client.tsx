@@ -14,7 +14,7 @@ import { onPoint, takePoint } from "./shared/pointer";
 
 // No install hook opens a screen, so this item takes the screen over when it first renders (ticket 009): once, while
 // this computer has not seen the welcome. The app's globalThis survives a plugin reload, so a reload does not reopen it.
-const g = globalThis as { __agenticPocketsWelcomeOpened?: boolean };
+const g = globalThis as { __agenticPocketsWelcomeOpenedFor?: string };
 
 // "Set up later" shows where setup lives (ticket 18): the row anchors a pop-up to itself, in the house pop-up's
 // look, and a circle pulses round it until the user presses the row or the pop-up closes, by its button or any other way.
@@ -66,12 +66,13 @@ function SetupItem({ theme, currentScreen, openScreen, openPopover }: PluginSide
     return onPoint(point);
   }, [openPopover]);
   const readWelcome = useRpc(welcomeReadRpc);
-  const welcome = useQuery({ queryKey: ["setup.welcome.read"], queryFn: () => readWelcome({}) });
+  // Asked until it answers: a server still starting must not leave the welcome closed for good.
+  const welcome = useQuery({ queryKey: ["setup.welcome.read"], queryFn: () => readWelcome({}), retry: true });
   useEffect(() => {
-    if (!takeOver({ seen: welcome.data?.seen, openedThisSession: g.__agenticPocketsWelcomeOpened === true })) return;
-    g.__agenticPocketsWelcomeOpened = true;
+    if (!takeOver({ seen: welcome.data?.seen, server: welcome.data?.server, openedFor: g.__agenticPocketsWelcomeOpenedFor })) return;
+    g.__agenticPocketsWelcomeOpenedFor = welcome.data?.server;
     openScreen({ screenId: "setup" });
-  }, [welcome.data?.seen, openScreen]);
+  }, [welcome.data?.seen, welcome.data?.server, openScreen]);
   // The label changes once the tutorial is complete (ticket 009); the item stays as the way into help.
   const readTutorial = useRpc(tutorialReadRpc);
   const tutorial = useQuery({ queryKey: ["setup.tutorial.read"], queryFn: () => readTutorial({}), refetchInterval: 60_000 });
