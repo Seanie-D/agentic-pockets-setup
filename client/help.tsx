@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { helpAskRpc, helpGlossaryRpc } from "../shared/contracts";
+import { PICTURE_TIP } from "../shared/beautiful-chat";
 
 type S = Record<"h2" | "p" | "muted" | "good" | "quiet" | "quietText", object>;
 type Asked = { ok: boolean; agentId?: string; citizen?: string; message: string };
@@ -35,6 +36,10 @@ export function Help({ s, theme, lead, navigation }: { s: S; theme: PluginTheme;
       <View style={{ gap: 6, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: c.accent }}>
         <Text style={s.h2}>When something does not make sense</Text>
         <Text style={s.p}>{WAIT_WHAT}</Text>
+      </View>
+      <View style={{ gap: 6 }}>
+        <Text style={s.h2}>Pictures in your messages</Text>
+        <Text style={s.p}>{PICTURE_TIP}</Text>
       </View>
       <Text style={s.h2}>The glossary</Text>
       <Text style={s.muted}>The words your citizens use.{lead ? ` Tap a word to ask ${lead} about it.` : ""}</Text>

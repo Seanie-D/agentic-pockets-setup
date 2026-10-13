@@ -7,3 +7,7 @@ export const BEAUTIFUL_CHAT = {
   source: "git:https://github.com/ABorakati/beautiful-chat.git",
   ref: "42b61d8301b5400a67821bbbfcf99fa8b681dc37",
 };
+
+// Help's line on pasted pictures (ticket 022, the approved words): with Beautiful Chat's "Enhanced prompt bubble" on, its
+// default, a pasted picture does not show in the user's own message, because Paseo hands plugins the text only.
+export const PICTURE_TIP = "Pasted a picture and cannot see it in your message? Your citizen still got it. To see it, turn off Settings → Beautiful Chat → Enhanced prompt bubble.";
