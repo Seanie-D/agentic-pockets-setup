@@ -1,5 +1,5 @@
 // A release piece's hash, in a house (the update system, ticket 01): the same hashing as the release build
-// (Pockets/Jarvis/builds/first-run/publish/pieces.mjs, where the pieces are named). Both tests pin one fixture and
+// (Commons/skills/records/house-update/pieces.mjs, where the pieces are named). Both tests pin one fixture and
 // the same hashes. A pocket's session logs, tasks and inbox, and Claude Code's per-house .claude/settings.local.json,
 // are the house's own and in no piece; a pack's shipped memory is its own piece, memory:<Name>.
 import fs from "node:fs";
