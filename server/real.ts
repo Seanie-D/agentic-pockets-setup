@@ -47,8 +47,27 @@ async function setProjectIcon(projectId: string, png: string): Promise<void> {
 export function ops(paseo: PaseoApi): Ops {
   const handles = new Map<string, Awaited<ReturnType<PaseoApi["workspaces"]["create"]>>>();
   return {
-    async createWorkspace({ dir, title }) {
-      const w = await paseo.workspaces.create({ source: { kind: "directory", path: dir }, title });
+    // One project for the whole house (ticket 023), as paseo-bots makes its "Bots" project (MIT, shared/chat.ts): the
+    // project already at the root, else the one Paseo registers when the root is opened, whose own workspace is archived
+    // so the project lists only citizens. Named by the Paseo command where it is found; the folder's name otherwise.
+    async houseProject(root, name) {
+      const same = (p: string | undefined) => !!p && path.resolve(p) === path.resolve(root);
+      let id = (await paseo.projects.list()).projects.find((p) => same(p.projectRootPath))?.projectId ?? null;
+      if (!id) {
+        const w = await paseo.workspaces.open(root);
+        id = (w.current() ?? (await w.refresh()))?.projectId ?? w.projectId;
+        await paseo.workspaces.archive(w).catch(() => undefined);
+      }
+      if (id) exec("paseo", ["project", "rename", id, name]);
+      return id;
+    },
+    // A citizen's workspace in the house project; one already there for its folder is kept, so a retry makes no twin.
+    async createWorkspace({ dir, title, projectId }) {
+      if (projectId) {
+        const mine = (await paseo.workspaces.list()).entries.find((w) => w.projectId === projectId && w.workspaceDirectory && path.resolve(w.workspaceDirectory) === path.resolve(dir));
+        if (mine) { const h = paseo.workspaces.ref(mine); handles.set(h.id, h); return { workspaceId: mine.id, projectId }; }
+      }
+      const w = await paseo.workspaces.create({ source: { kind: "directory", path: dir, ...(projectId ? { projectId } : {}) }, title });
       handles.set(w.id, w);
       return { workspaceId: w.id, projectId: w.projectId };
     },

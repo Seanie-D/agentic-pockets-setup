@@ -14,6 +14,7 @@ function upstream() {
   w("Commons/tenets.md", "11. **Scripts flag, {{USER_NAME}} decides.**\n"); w("Commons/skills/x/SKILL.md", "Fill {{SKIPS}} here; {{USER_NAME}} owns it.\n"); w("Pockets/_Template/core/VERSION", "0.1.22");
   w("plugins/agentic-pockets/paseo-plugin.json", '{ "id": "agentic-pockets" }');
   for (const n of ["Ultron", "Jarvis", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
+  w("house.png", "png-house");
   return u;
 }
 function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[] } = {}) {
@@ -34,7 +35,8 @@ function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean;
       return new Response(JSON.stringify(s === 200 ? { repo: "git@github.com:Seanie-D/agentic-pockets.git" } : { error: "this invite has already been used" }), { status: s });
     },
     ops: {
-      createWorkspace: async ({ dir, title }) => { log.push(`workspace ${title} ${dir}`); return { workspaceId: `wks_${title}`, projectId: `prj_${title}` }; },
+      houseProject: async (root, name) => { log.push(`project ${root} "${name}"`); return "prj_house"; },
+      createWorkspace: async ({ dir, title, projectId }) => { log.push(`workspace ${title} ${dir} ${projectId}`); return { workspaceId: `wks_${title}`, projectId: projectId ?? `prj_${title}` }; },
       setIcon: async (projectId, png) => { log.push(`icon ${projectId} ${fs.readFileSync(png, "utf8")}`); },
       addPlugin: async (id, dir) => { log.push(`plugin ${id} ${dir}`); return { running: true }; },
       addProvider: async (id, configDir) => { log.push(`provider ${id} ${configDir}`); },
@@ -62,11 +64,15 @@ test("a full run: key, invite, house, a workspace and face per citizen, the firs
   assert.ok(!fs.existsSync(path.join(w.root, "Pockets", "Friday")), "a citizen not picked stays out");
   assert.ok(fs.existsSync(path.join(w.root, "Commons", "tenets.md")) && fs.existsSync(path.join(w.root, "Pockets", "_Template", "core", "VERSION")));
   assert.deepEqual(w.log.filter((l) => l.startsWith("workspace")).map((l) => l.split(" ")[1]), ["Ultron", "Verro", "Vision", "Jarvis"]);
-  assert.deepEqual(w.log.filter((l) => l.startsWith("icon")), ["icon prj_Ultron png-Ultron", "icon prj_Verro png-Verro", "icon prj_Vision png-Vision", "icon prj_Jarvis png-Jarvis"]);
+  // Ticket 023: one Paseo project for the whole house, every citizen a workspace in it, the house's one icon on it.
+  assert.deepEqual(w.log.filter((l) => l.startsWith("project")), [`project ${w.root} "Agentic Pockets"`]);
+  for (const n of ["Ultron", "Verro", "Vision", "Jarvis"]) assert.ok(w.log.includes(`workspace ${n} ${path.join(w.root, "Pockets", n)} prj_house`), n);
+  assert.deepEqual(w.log.filter((l) => l.startsWith("icon")), ["icon prj_house png-house"]);
   const desks = w.log.filter((l) => l.startsWith("desk"));
   assert.equal(desks.length, 1); assert.match(desks[0], /^desk Ultron — desk claude\/\S+ \{"role":"desk"\} cwd=.*Pockets\/Ultron$/);
   const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
   assert.deepEqual(rec.citizens, ["Jarvis", "Ultron", "Verro", "Vision"]); assert.equal(rec.setupDone, false);
+  assert.equal(rec.projectId, "prj_house", "kept, so a citizen added later joins the same project");
 });
 
 test("one citizen alone: its own desk is the first desk", async () => {
