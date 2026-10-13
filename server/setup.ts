@@ -4,7 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { PROFILE_PROVIDER, profileDir } from "./profile.ts";
-import { DESK_WELCOME_ON } from "../shared/desk-welcome.ts";
+import { DESK_WELCOME_ON, nameOf } from "../shared/desk-welcome.ts";
 import { season } from "./seasonings.ts";
 import { applyExtrasOff, type Extra } from "./tools.ts";
 import { DEFAULT_MODE, tierFor, withTier, type Mode } from "../shared/mode.ts";
@@ -207,7 +207,7 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   const spaces: Record<string, string> = {};
   for (const n of input.citizens) {
     const dir = path.join(input.root, "Pockets", n);
-    const w = await deps.ops.createWorkspace({ dir, title: n });
+    const w = await deps.ops.createWorkspace({ dir, title: nameOf(n) });   // the display name, as the welcome card says it
     spaces[n] = w.workspaceId;
     const face = path.join(dir, "face.png");
     if (w.projectId && fs.existsSync(face)) await deps.ops.setIcon(w.projectId, face).catch(() => { /* a face is nice, not needed */ });

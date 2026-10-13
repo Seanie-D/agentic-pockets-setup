@@ -359,3 +359,10 @@ test("Beautiful Chat: when it cannot be added, setup goes on and says where to a
   assert.equal(r.ok, true);
   assert.ok(r.steps.some((x) => x.startsWith("Setup could not add Beautiful Chat") && x.includes("Settings, Plugins") && x.includes("git:https://github.com/ABorakati/beautiful-chat.git")), r.steps.join("\n"));
 });
+
+test("a citizen's Paseo workspace is titled with its display name: Miss Minutes, not MissMinutes", async () => {
+  const w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["MissMinutes"], accounts: { MissMinutes: "claude" }, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.ok(w.log.some((l) => l.startsWith("workspace Miss Minutes ")), w.log.filter((l) => l.startsWith("workspace")).join("\n"));
+});
