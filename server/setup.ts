@@ -17,6 +17,8 @@ export interface Ops {
   setIcon(projectId: string, pngPath: string): Promise<void>;
   addPlugin(id: string, dir: string): Promise<{ running: boolean }>;
   addProvider(id: string, configDir: string): Promise<void>;
+  // Gives Paseo Claude's full path when Paseo cannot find Claude itself; the path, or null when nothing changed.
+  pinClaude(): Promise<string | null>;
   installGitPlugin(source: string, ref?: string): Promise<void>;
   hasPlugin(id: string): Promise<boolean>;
   welcome(agentId: string, citizen: string): Promise<void>;
@@ -207,6 +209,9 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
     input = { ...input, accounts: Object.fromEntries(input.citizens.map((n) => [n, (input.accounts[n] ?? "claude") === "claude" ? PROFILE_PROVIDER : input.accounts[n]])) };
     steps.push("Gave the house its own Claude profile. Your own hooks stay in your other projects.");
   }
+
+  // Paseo must be able to start Claude before any desk opens (Friday's Mac walk, 2026-10-13: ~/.local/bin is not on its PATH).
+  if (await deps.ops.pinClaude().catch(() => null)) steps.push("Showed Paseo where Claude Code is.");
 
   // 5. A Paseo workspace with its face per citizen, then the first desk: Ultron's when he is there, else the one citizen's.
   const spaces: Record<string, string> = {};

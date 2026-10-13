@@ -11,6 +11,7 @@ import type { AgentRecord, DiscussDeps } from "./discuss";
 import type { RewardDeps } from "./reward";
 import { WELCOME_KIND } from "../shared/desk-welcome";
 import { cmdLine, joinPath, registryPath, withPath } from "../shared/winpath";
+import { findCommand, pinClaude } from "../shared/claude-path";
 
 export const DOORMAN = "https://pockets-doorman.sank-junior-purple.workers.dev";
 
@@ -95,6 +96,20 @@ export function ops(paseo: PaseoApi): Ops {
     async installGitPlugin(source, ref) {
       const r = exec("paseo", ["plugin", "install", source, ...(ref ? ["--ref", ref] : []), "--json"]);
       if (r.status !== 0) throw new Error((r.stderr || r.stdout).trim().split("\n").pop()?.slice(0, 160) || "the Paseo command was not found");
+    },
+    async pinClaude() {
+      const win = process.platform === "win32";
+      const names = win ? ["claude.exe"] : ["claude"];
+      const isFile = (p: string) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
+      const sep = win ? ";" : ":";
+      const found = findCommand(pathEnv().split(sep), names, path.sep, isFile);
+      const paseoFinds = findCommand((process.env.PATH ?? "").split(sep), names, path.sep, isFile);
+      const { config } = await paseo.config.get();
+      const providers = pinClaude((config as { providers?: Record<string, Record<string, unknown>> }).providers ?? {}, found, paseoFinds);
+      if (!providers) return null;
+      await paseo.config.patch({ providers } as Parameters<PaseoApi["config"]["patch"]>[0]);
+      exec("paseo", ["reload"]);   // proven to apply it at once; the patch may already have
+      return found;
     },
     async openDesk(o) {
       const w = handles.get(o.workspaceId);

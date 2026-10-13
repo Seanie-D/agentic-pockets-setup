@@ -38,6 +38,7 @@ function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean;
       setIcon: async (projectId, png) => { log.push(`icon ${projectId} ${fs.readFileSync(png, "utf8")}`); },
       addPlugin: async (id, dir) => { log.push(`plugin ${id} ${dir}`); return { running: true }; },
       addProvider: async (id, configDir) => { log.push(`provider ${id} ${configDir}`); },
+      pinClaude: async () => null,
       installGitPlugin: async (source, ref) => { log.push(`gitplugin ${source}${ref ? ` @${ref}` : ""}`); if (source.includes("paseo-cafe") ? opts.cafeFails : opts.chatFails) throw new Error("no paseo command"); },
       hasPlugin: async (id) => (opts.installed ?? []).includes(id),
       welcome: async (agentId, citizen) => { log.push(`welcome ${agentId} ${citizen}`); },
