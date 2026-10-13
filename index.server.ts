@@ -56,7 +56,7 @@ export default function contribute(server: PluginServerContext) {
     // Claude must be signed in first, the user's own or the clean profile's: a signed-out one greets the user with "Not logged in".
     if (!cleanProfile && !signedInTo(exec, null)) return { ok: false, message: "Sign in to Claude first: step 1, after the tools.", steps: [] };
     if (cleanProfile && !signedIn(exec, os.homedir())) return { ok: false, message: "Sign in to Claude for your house first, or switch the clean profile off.", steps: [] };
-    return install({ code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, cleanProfile, mode, cafe, root: ROOT, home: os.homedir() }, deps(paseo));
+    return install({ paseoHome: process.env.PASEO_HOME, code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, cleanProfile, mode, cafe, root: ROOT, home: os.homedir() }, deps(paseo));
   });
   server.handle(finishRpc, async () => {
     const rec = record(); fs.writeFileSync(path.join(ROOT, "house.json"), JSON.stringify({ ...rec, setupDone: true, updatedAt: new Date().toISOString() }, null, 2) + "\n");

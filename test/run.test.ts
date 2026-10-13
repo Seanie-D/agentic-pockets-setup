@@ -378,3 +378,17 @@ test("setup says when it showed Paseo where Claude is, and why it could not", as
   const r2 = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: bad.root, home: bad.home }, bad.deps);
   assert.ok(r2.steps.includes("Could not show Paseo where Claude Code is: config.patch refused."), r2.steps.join("\n"));
 });
+
+// The update system, ticket 06: setup changes only through the house's offer, so the Cafe never updates it.
+test("with the Cafe added, or already in Paseo, setup is on the Cafe's opt-out list", async () => {
+  for (const o of [{ cafe: true, installed: [] as string[] }, { cafe: false, installed: ["paseo-cafe"] }]) {
+    const w = world({ installed: o.installed });
+    const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home, cafe: o.cafe }, w.deps);
+    assert.equal(r.ok, true, r.message);
+    const f = path.join(w.home, ".paseo", "plugin-settings", "paseo-cafe", "directory-settings.json");
+    assert.deepEqual(JSON.parse(fs.readFileSync(f, "utf8")).values.autoUpdateOptOuts, ["agentic-pockets-setup"]);
+  }
+  const none = world();
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: none.root, home: none.home }, none.deps);
+  assert.ok(!fs.existsSync(path.join(none.home, ".paseo", "plugin-settings", "paseo-cafe")), "no Cafe: nothing written");
+});

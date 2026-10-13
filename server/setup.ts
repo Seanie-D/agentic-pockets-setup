@@ -8,7 +8,8 @@ import { DESK_WELCOME_ON, nameOf } from "../shared/desk-welcome.ts";
 import { season } from "./seasonings.ts";
 import { applyExtrasOff, type Extra } from "./tools.ts";
 import { DEFAULT_MODE, tierFor, withTier, type Mode } from "../shared/mode.ts";
-import { CAFE } from "../shared/cafe.ts";
+import { CAFE, withOptOut } from "../shared/cafe.ts";
+const SETUP_ID = "agentic-pockets-setup";   // this plugin's own Paseo id (paseo-plugin.json)
 import { BEAUTIFUL_CHAT } from "../shared/beautiful-chat.ts";
 
 export interface Exec { (cmd: string, args: string[], o?: { env?: Record<string, string>; cwd?: string }): { status: number | null; stdout: string; stderr: string } }
@@ -25,7 +26,7 @@ export interface Ops {
   openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
 }
 export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; doorman: string; now: () => string }
-export interface SetupInput { code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean; welcome?: boolean; mode?: Mode; cafe?: boolean }
+export interface SetupInput { paseoHome?: string; code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean; welcome?: boolean; mode?: Mode; cafe?: boolean }
 export interface SetupResult { ok: boolean; message: string; steps: string[]; firstDesk?: { citizen: string; agentId: string | null } }
 
 // The first line of the first desk (ticket 004 Q11): setup is not finished, so the citizen says hello, sends the user
@@ -180,7 +181,14 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
     catch (e) { steps.push(`Setup could not add Beautiful Chat (${String((e as Error)?.message ?? e).slice(0, 160)}). Your house works without it. You can add it in Paseo: Settings, Plugins, Plugin source: ${BEAUTIFUL_CHAT.source}`); }
   }
 
-  // The Paseo Cafe, only when the user ticked it; the house works without it.
+  // The Paseo Cafe, only when the user ticked it; the house works without it. With the Cafe in Paseo, setup goes on its
+  // opt-out list first, before the Cafe's first update run: setup changes only through the house's offer (ticket 06).
+  if (input.cafe || await deps.ops.hasPlugin(CAFE.id)) {
+    const f = path.join(input.paseoHome ?? path.join(input.home, ".paseo"), "plugin-settings", CAFE.id, "directory-settings.json");
+    let cur = null; try { cur = JSON.parse(fs.readFileSync(f, "utf8")); } catch { /* none yet */ }
+    try { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(withOptOut(cur, SETUP_ID))); }
+    catch (e) { steps.push(`Setup could not keep the Paseo Cafe from updating it (${String((e as Error)?.message ?? e).slice(0, 120)}).`); }
+  }
   if (input.cafe) {
     try { await deps.ops.installGitPlugin(CAFE.source); steps.push("Added the Paseo Cafe to Paseo."); }
     catch (e) { steps.push(`Setup could not add the Paseo Cafe (${String((e as Error)?.message ?? e).slice(0, 160)}). You can add it in Paseo: Settings, Plugins, Plugin source: ${CAFE.source}`); }
