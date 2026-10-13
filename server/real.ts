@@ -97,18 +97,19 @@ export function ops(paseo: PaseoApi): Ops {
       const r = exec("paseo", ["plugin", "install", source, ...(ref ? ["--ref", ref] : []), "--json"]);
       if (r.status !== 0) throw new Error((r.stderr || r.stdout).trim().split("\n").pop()?.slice(0, 160) || "the Paseo command was not found");
     },
+    // Claude where setup finds it but Paseo, on its own PATH, does not (~/.local/bin on the Mac): Paseo gets the full path.
     async pinClaude() {
-      const win = process.platform === "win32";
-      const names = win ? ["claude.exe"] : ["claude"];
+      const names = process.platform === "win32" ? ["claude.exe"] : ["claude"];
       const isFile = (p: string) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
-      const sep = win ? ";" : ":";
-      const found = findCommand(pathEnv().split(sep), names, path.sep, isFile);
-      const paseoFinds = findCommand((process.env.PATH ?? "").split(sep), names, path.sep, isFile);
+      const found = findCommand(pathEnv().split(path.delimiter), names, path.sep, isFile);
+      const paseoFinds = findCommand((process.env.PATH ?? "").split(path.delimiter), names, path.sep, isFile);
       const { config } = await paseo.config.get();
       const providers = pinClaude((config as { providers?: Record<string, Record<string, unknown>> }).providers ?? {}, found, paseoFinds);
       if (!providers) return null;
       await paseo.config.patch({ providers } as Parameters<PaseoApi["config"]["patch"]>[0]);
-      exec("paseo", ["reload"]);   // proven to apply it at once; the patch may already have
+      // A reload applied it at once on a test Paseo; the patch alone is untested, so a failed reload is said.
+      const r = exec("paseo", ["reload"]);
+      if (r.status !== 0) throw new Error(`Paseo has the path ${found}, but did not reload; quit and reopen Paseo`);
       return found;
     },
     async openDesk(o) {

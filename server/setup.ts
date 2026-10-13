@@ -211,7 +211,8 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   }
 
   // Paseo must be able to start Claude before any desk opens (Friday's Mac walk, 2026-10-13: ~/.local/bin is not on its PATH).
-  if (await deps.ops.pinClaude().catch(() => null)) steps.push("Showed Paseo where Claude Code is.");
+  try { const at = await deps.ops.pinClaude(); if (at) steps.push(`Showed Paseo where Claude Code is: ${at}.`); }
+  catch (e) { steps.push(`Could not show Paseo where Claude Code is: ${String((e as Error).message).slice(0, 160)}.`); }
 
   // 5. A Paseo workspace with its face per citizen, then the first desk: Ultron's when he is there, else the one citizen's.
   const spaces: Record<string, string> = {};

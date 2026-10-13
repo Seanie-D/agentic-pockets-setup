@@ -16,7 +16,7 @@ function upstream() {
   for (const n of ["Ultron", "Jarvis", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
   return u;
 }
-function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[] } = {}) {
+function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[]; pin?: () => Promise<string | null> } = {}) {
   const up = upstream(); const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-")); const root = path.join(home, "agentic-pockets");
   const log: string[] = []; const posts: any[] = [];
   const deps: Deps = {
@@ -38,7 +38,7 @@ function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean;
       setIcon: async (projectId, png) => { log.push(`icon ${projectId} ${fs.readFileSync(png, "utf8")}`); },
       addPlugin: async (id, dir) => { log.push(`plugin ${id} ${dir}`); return { running: true }; },
       addProvider: async (id, configDir) => { log.push(`provider ${id} ${configDir}`); },
-      pinClaude: async () => null,
+      pinClaude: opts.pin ?? (async () => null),
       installGitPlugin: async (source, ref) => { log.push(`gitplugin ${source}${ref ? ` @${ref}` : ""}`); if (source.includes("paseo-cafe") ? opts.cafeFails : opts.chatFails) throw new Error("no paseo command"); },
       hasPlugin: async (id) => (opts.installed ?? []).includes(id),
       welcome: async (agentId, citizen) => { log.push(`welcome ${agentId} ${citizen}`); },
@@ -366,4 +366,15 @@ test("a citizen's Paseo workspace is titled with its display name: Miss Minutes,
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["MissMinutes"], accounts: { MissMinutes: "claude" }, root: w.root, home: w.home }, w.deps);
   assert.equal(r.ok, true, r.message);
   assert.ok(w.log.some((l) => l.startsWith("workspace Miss Minutes ")), w.log.filter((l) => l.startsWith("workspace")).join("\n"));
+});
+
+// Friday's Mac walk, 2026-10-13: Paseo could not start Claude from ~/.local/bin. Setup shows it the path, and says so;
+// when that fails, the step names why, so the desk's "not available" is not the only clue.
+test("setup says when it showed Paseo where Claude is, and why it could not", async () => {
+  const ok = world({ pin: async () => "/Users/nick/.local/bin/claude" });
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: ok.root, home: ok.home }, ok.deps);
+  assert.ok(r.steps.includes("Showed Paseo where Claude Code is: /Users/nick/.local/bin/claude."), r.steps.join("\n"));
+  const bad = world({ pin: async () => { throw new Error("config.patch refused"); } });
+  const r2 = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: bad.root, home: bad.home }, bad.deps);
+  assert.ok(r2.steps.includes("Could not show Paseo where Claude Code is: config.patch refused."), r2.steps.join("\n"));
 });
