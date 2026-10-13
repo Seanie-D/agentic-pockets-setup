@@ -14,14 +14,11 @@ import { askToPoint } from "../shared/pointer";
 import { TutorialView } from "./tutorial";
 import { PACKS, emptyPick, toggle, view, type Pick } from "../shared/picker";
 import { openExternal } from "./web";
+import { HELP } from "../shared/help-links";
 
 const NAMES: Record<string, string> = { MissMinutes: "Miss Minutes" };
 const label = (n: string) => NAMES[n] ?? n;
 const ULTRON_LINE = "The Orchestrator, a catch-all agent that can coordinate efforts to your other Pocket Citizens or be your funnel for everything. One-size-fits-all, a more dialed-in Claude type experience that remembers who you are and what you need.";
-const HELP: Record<string, string> = {
-  node: "https://nodejs.org/en/download", git: "https://git-scm.com/downloads",
-  claude: "https://docs.claude.com/en/docs/claude-code/setup", paseo: "https://paseo.sh",
-};
 
 export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const c = theme.colors;

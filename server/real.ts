@@ -10,6 +10,7 @@ import type { Deps, Exec, Ops } from "./setup";
 import type { AgentRecord, DiscussDeps } from "./discuss";
 import type { RewardDeps } from "./reward";
 import { WELCOME_KIND } from "../shared/desk-welcome";
+import { joinPath, registryPath } from "../shared/winpath";
 
 export const DOORMAN = "https://pockets-doorman.sank-junior-purple.workers.dev";
 
@@ -22,7 +23,11 @@ const EXTRA_PATH = process.platform === "win32"
     `${process.env.ProgramFiles ?? "C:\\Program Files"}\\Paseo\\resources\\bin`, `${process.env.LOCALAPPDATA ?? ""}\\Programs\\Paseo\\resources\\bin`]
   : ["/opt/homebrew/bin", "/usr/local/bin", `${os.homedir()}/.local/bin`, `${os.homedir()}/.claude/local`,
     "/Applications/Paseo.app/Contents/Resources/bin", "/opt/Paseo/resources/bin"];
-export const pathEnv = () => [process.env.PATH ?? "", ...EXTRA_PATH].filter(Boolean).join(process.platform === "win32" ? ";" : ":");
+// On Windows the registry's PATH joins too, read fresh each time, so a tool winget just installed is found at once.
+const reg = (key: string) => spawnSync("reg", ["query", key, "/v", "Path"], { encoding: "utf8", windowsHide: true, timeout: 10_000 }).stdout ?? "";
+export const pathEnv = () => process.platform === "win32"
+  ? joinPath(";", process.env.PATH ?? "", registryPath(reg("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"), reg("HKCU\\Environment"), process.env), EXTRA_PATH)
+  : [process.env.PATH ?? "", ...EXTRA_PATH].filter(Boolean).join(":");
 
 export const exec: Exec = (cmd, args, o) => {
   const env: NodeJS.ProcessEnv = { ...process.env, PATH: pathEnv(), ...(o?.env ?? {}) };
