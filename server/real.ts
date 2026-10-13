@@ -10,7 +10,7 @@ import type { Deps, Exec, Ops } from "./setup";
 import type { AgentRecord, DiscussDeps } from "./discuss";
 import type { RewardDeps } from "./reward";
 import { WELCOME_KIND } from "../shared/desk-welcome";
-import { joinPath, registryPath, withPath } from "../shared/winpath";
+import { cmdLine, joinPath, registryPath, withPath } from "../shared/winpath";
 
 export const DOORMAN = "https://pockets-doorman.sank-junior-purple.workers.dev";
 
@@ -38,7 +38,9 @@ export const pathEnv = () => process.platform === "win32"
 export const exec: Exec = (cmd, args, o) => {
   const env: NodeJS.ProcessEnv = { ...withPath({ ...process.env }, pathEnv()), ...(o?.env ?? {}) };
   delete env.PASEO_AGENT_ID; delete env.PASEO_AGENT_CWD;
-  const r = spawnSync(cmd, args, { env, cwd: o?.cwd, encoding: "utf8", timeout: 300_000, shell: process.platform === "win32" });
+  // On Windows cmd runs it, so a .cmd shim (paseo, claude, npm) is found; the line is built here, each argument quoted.
+  const win = process.platform === "win32";
+  const r = spawnSync(win ? cmdLine(cmd, args) : cmd, win ? [] : args, { env, cwd: o?.cwd, encoding: "utf8", timeout: 300_000, shell: win });
   return { status: r.error ? 127 : r.status, stdout: r.stdout ?? "", stderr: (r.stderr ?? "") + (r.error ? String(r.error.message) : "") };
 };
 

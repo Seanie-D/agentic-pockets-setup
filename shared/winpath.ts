@@ -38,3 +38,12 @@ export function withPath<T extends Record<string, string | undefined>>(env: T, v
   out[keys[0] ?? "PATH"] = value;
   return out as T;
 }
+
+// The one line cmd runs. Node joins a shell command's arguments without quotes, so an empty argument vanished and a
+// spaced one split (ssh-keygen's `-N ""`, Friday's Windows walk, 2026-10-13). Each argument that needs it is quoted
+// by the C runtime's rules: a quote becomes \", and the backslashes before a quote or the closing quote are doubled.
+export function cmdLine(cmd: string, args: string[]): string {
+  const quote = (a: string) => a !== "" && !/[\s"&|<>^()]/.test(a) ? a
+    : `"${a.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, "$1$1")}"`;
+  return [cmd, ...args].map(quote).join(" ");
+}
