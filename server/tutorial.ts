@@ -11,8 +11,8 @@ export const LABEL_AFTER = "Agentic Pockets Help";
 
 export interface Line { text: string; needs?: string }
 export interface Bubble { from: "you" | "citizen"; text: string }
-export interface Item { id: string; title: string; body: string; lines?: Line[]; example?: Bubble[]; done: { at: string; by: string } | null }
-interface RawItem { id: string; title: string; body: string; lines?: Line[]; example?: Bubble[]; needs?: string; exampleNeeds?: string; tickedBy?: string }
+export interface Item { id: string; icon?: string; title: string; body: string; lines?: Line[]; example?: Bubble[]; done: { at: string; by: string } | null }
+interface RawItem { id: string; icon?: string; title: string; body: string; lines?: Line[]; example?: Bubble[]; needs?: string; exampleNeeds?: string; tickedBy?: string }
 // What this house has (`needs`: "janitor", "desk-handoff", "cafe") and what is already true (`tickedBy`: "paseo", "house",
 // "first-message"). Injected so the tests can set both; realProbe reads the machine.
 export interface Probe { has(need: string): boolean; state(key: string): boolean }
@@ -31,8 +31,8 @@ export function readTutorial(root: string, probe: Probe = realProbe(root)): Tuto
   const list = [...(readJson(path.join(root, "Commons", "tutorial", "items.json")) ?? []), ...(readJson(path.join(root, "Commons", "skills", "jhs", "tutorial-items.json")) ?? [])] as RawItem[];
   // The owner, ticket 009: "If the plugin was not installed as part of setup, or does not otherwise exist on Paseo, then the
   // tutorial does not mention it." The same rule hides a line or an example.
-  const items: Item[] = list.filter((i) => !i.needs || probe.has(i.needs)).map(({ id, title, body, lines, example, exampleNeeds }) => ({
-    id, title, body,
+  const items: Item[] = list.filter((i) => !i.needs || probe.has(i.needs)).map(({ id, icon, title, body, lines, example, exampleNeeds }) => ({
+    id, ...(icon ? { icon } : {}), title, body,
     ...(lines ? { lines: lines.filter((l) => !l.needs || probe.has(l.needs)).map(({ text }) => ({ text })) } : {}),
     ...(example && (!exampleNeeds || probe.has(exampleNeeds)) ? { example } : {}),
     done: null,

@@ -80,15 +80,16 @@ export function TutorialView({ s, theme, compact, navigation }: { s: S; theme: P
           {items.map((i) => (
             <Pressable key={i.id} accessibilityRole="button" onPress={() => setCur(i.id)}
               style={{ paddingVertical: 6, paddingHorizontal: 8, borderRadius: 8, backgroundColor: i.id === page.id ? c.surface2 : "transparent" }}>
-              <Text style={i.done ? s.good : s.p}>{i.done ? "✓" : "○"}  {i.title}</Text>
+              <Text style={i.done ? s.good : s.p}>{i.done ? "✓" : "○"}  {i.icon ? `${i.icon} ` : ""}{i.title}</Text>
             </Pressable>
           ))}
         </View>
         <View style={{ flex: compact ? undefined : 1, gap: 10 }}>
-          <Text style={s.h2}>{page.title}</Text>
+          <Text style={s.h2}>{page.icon ? `${page.icon}  ` : ""}{page.title}</Text>
           <Text style={s.p}>{page.body}</Text>
           {page.lines?.map((l, k) => <Text key={k} style={s.p}>•  {l.text}</Text>)}
-          {page.example && <Example key={page.id} example={page.example} animate={fresh[page.id] === true} theme={theme} />}
+          {/* Drawn once fresh is known: drawn before, its bubbles start shown and the fade-in has nothing to show (the walk). */}
+          {page.example && page.id in fresh && <Example key={page.id} example={page.example} animate={fresh[page.id] === true} theme={theme} />}
           {page.done && <Text style={s.muted}>Explained by {NAMES[page.done.by] ?? page.done.by}</Text>}
           {lead && <Pressable accessibilityRole="button" style={[s.quiet, { alignSelf: "flex-start" }]} disabled={discuss.isPending || help.isPending} onPress={() => t.complete ? help.mutate({ kind: "page", id: page.id }) : discuss.mutate({ itemId: page.id })}><Text style={s.quietText}>{ask}</Text></Pressable>}
           {discuss.data && !t.complete && <Text style={discuss.data.ok ? s.good : s.muted}>{discuss.data.message}</Text>}

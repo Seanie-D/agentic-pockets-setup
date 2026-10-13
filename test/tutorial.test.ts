@@ -12,7 +12,7 @@ function house(o: { jhs?: boolean } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "house-"));
   const w = (f: string, body: string) => { fs.mkdirSync(path.dirname(path.join(root, f)), { recursive: true }); fs.writeFileSync(path.join(root, f), body); };
   w("Commons/tutorial/items.json", JSON.stringify([
-    { id: "desk", title: "One desk per citizen", body: "Talk to Brandon where he is." },
+    { id: "desk", icon: "💬", title: "One desk per citizen", body: "Talk to Brandon where he is." },
     { id: "lifemap", title: "The Life Map", body: "Every citizen is a bubble." },
     { id: "mail", title: "Mail between citizens", body: "The Mailman wakes a citizen." },
   ]));
@@ -25,6 +25,13 @@ function house(o: { jhs?: boolean } = {}) {
 test("the checklist comes from the house, and the JHS items join it only in a house that has the JHS skills", () => {
   assert.deepEqual(readTutorial(house().root).items.map((i) => i.id), ["desk", "lifemap", "mail"]);
   assert.deepEqual(readTutorial(house({ jhs: true }).root).items.map((i) => i.id), ["desk", "lifemap", "mail", "jhs"]);
+});
+
+// Sean's 15:51 walk, 2026-10-13: the tutorial lacked the prototype's emojis. An item's icon travels to the screen.
+test("an item's icon reaches the screen; an item with none has none", () => {
+  const items = readTutorial(house().root).items;
+  assert.equal(items[0].icon, "💬");
+  assert.equal(items[1].icon, undefined);
 });
 
 test("ticks from every citizen's own pocket are added up; the first tick of an item counts, with who ticked it", () => {
