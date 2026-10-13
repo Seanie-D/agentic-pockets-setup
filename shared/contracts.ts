@@ -40,6 +40,9 @@ export const finishRpc = defineRpc({ name: "setup.finish", input: z.object({}), 
 // The clean profile's sign-in (ticket 004): is the house's own Claude folder signed in, and start the browser sign-in.
 export const profileStatusRpc = defineRpc({ name: "setup.profile.status", input: z.object({}), output: z.object({ signedIn: z.boolean() }) });
 export const profileSignInRpc = defineRpc({ name: "setup.profile.signin", input: z.object({}), output: z.object({ started: z.boolean(), message: z.string() }) });
+// The user's own Claude, signed in right after the tools (Sean, 2026-10-13).
+export const claudeStatusRpc = defineRpc({ name: "setup.claude.status", input: z.object({}), output: z.object({ signedIn: z.boolean() }) });
+export const claudeSignInRpc = defineRpc({ name: "setup.claude.signin", input: z.object({}), output: z.object({ started: z.boolean(), message: z.string() }) });
 // How the citizens run, changed after setup (ticket 004 Q11), and "Ask about this" on a setup choice: the lead's desk.
 export const modeSetRpc = defineRpc({ name: "setup.mode.set", input: z.object({ mode: z.enum(["on-demand", "always-on"]) }), output: z.object({ ok: z.boolean(), changed: z.array(z.string()), message: z.string().optional() }) });
 export const askRpc = defineRpc({ name: "setup.ask", input: z.object({ topic: z.enum(["mode"]) }),

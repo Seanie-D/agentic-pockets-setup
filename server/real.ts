@@ -152,11 +152,12 @@ export function deps(paseo: PaseoApi): Deps {
   return { exec, fetch: globalThis.fetch, ops: ops(paseo), hostname: () => os.hostname().replace(/\.local$/, ""), doorman: DOORMAN, now: () => new Date().toISOString() };
 }
 
-// The clean profile's browser sign-in: `claude auth login` with the house's folder, left running on its own; Claude opens
-// the browser, and the screen asks claude auth status until it reads signed in. It has no terminal, so nothing waits on it.
-export function startSignIn(configDir: string): { started: boolean; message: string } {
+// The browser sign-in: `claude auth login` in the house's folder (the clean profile), or with null in the user's own,
+// left running on its own; Claude opens the browser, and the screen asks claude auth status until it reads signed in.
+// It has no terminal, so nothing waits on it.
+export function startSignIn(configDir: string | null): { started: boolean; message: string } {
   try {
-    const env: NodeJS.ProcessEnv = { ...withPath({ ...process.env }, pathEnv()), CLAUDE_CONFIG_DIR: configDir };
+    const env: NodeJS.ProcessEnv = { ...withPath({ ...process.env }, pathEnv()), ...(configDir ? { CLAUDE_CONFIG_DIR: configDir } : {}) };
     delete env.PASEO_AGENT_ID; delete env.PASEO_AGENT_CWD;
     const c = spawn("claude", ["auth", "login"], { env, detached: true, stdio: "ignore", shell: process.platform === "win32" });
     c.on("error", () => { /* reported by the status check: still signed out */ });

@@ -5,9 +5,9 @@ import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { connect, install, packsIn, setMode } from "./server/setup";
 import { checkTools, installTools, listExtras } from "./server/tools";
 import { deps, discussDeps, exec, rewardDeps, startSignIn } from "./server/real";
-import { profileDir, signedIn } from "./server/profile";
+import { profileDir, signedIn, signedInTo } from "./server/profile";
 import { ask, discuss } from "./server/discuss";
-import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc, profileStatusRpc, profileSignInRpc, welcomeDismissRpc, welcomeReadRpc, modeSetRpc, askRpc } from "./shared/contracts";
+import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc, profileStatusRpc, profileSignInRpc, claudeStatusRpc, claudeSignInRpc, welcomeDismissRpc, welcomeReadRpc, modeSetRpc, askRpc } from "./shared/contracts";
 import { markWelcomeSeen, welcomeSeen } from "./server/welcome";
 import { markSeen, readTutorial, realProbe, stateTicks } from "./server/tutorial";
 import { rewardPass } from "./server/reward";
@@ -48,10 +48,13 @@ export default function contribute(server: PluginServerContext) {
   server.handle(connectRpc, async ({ code }, { paseo }) => connect({ code, root: ROOT, home: os.homedir() }, deps(paseo)));
   server.handle(profileStatusRpc, async () => ({ signedIn: signedIn(exec, os.homedir()) }));
   server.handle(profileSignInRpc, async () => startSignIn(profileDir(os.homedir())));
+  server.handle(claudeStatusRpc, async () => ({ signedIn: signedInTo(exec, null) }));
+  server.handle(claudeSignInRpc, async () => startSignIn(null));
   server.handle(modeSetRpc, async ({ mode }) => setMode(ROOT, mode));
   server.handle(askRpc, async ({ topic }, { paseo }) => ask(ROOT, topic, discussDeps(paseo)));
   server.handle(installRpc, async ({ userName, citizens, accounts, extrasOff, cleanProfile, mode, cafe }, { paseo }) => {
     // The clean profile needs its sign-in first: a signed-out folder would greet the user with "Not logged in".
+    if (!cleanProfile && !signedInTo(exec, null)) return { ok: false, message: "Sign in to Claude first: step 1, after the tools.", steps: [] };
     if (cleanProfile && !signedIn(exec, os.homedir())) return { ok: false, message: "Sign in to Claude for your house first, or switch the clean profile off.", steps: [] };
     return install({ code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, cleanProfile, mode, cafe, root: ROOT, home: os.homedir() }, deps(paseo));
   });

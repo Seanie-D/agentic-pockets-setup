@@ -5,7 +5,7 @@ import { useRpc } from "@getpaseo/plugin/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { connectRpc, finishRpc, installRpc, installToolsRpc, modeSetRpc, profileSignInRpc, profileStatusRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
+import { claudeSignInRpc, claudeStatusRpc, connectRpc, finishRpc, installRpc, installToolsRpc, modeSetRpc, profileSignInRpc, profileStatusRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
 import { DEFAULT_MODE, type Mode } from "../shared/mode";
 import { ModeChoice } from "./mode";
 import { CAFE } from "../shared/cafe";
@@ -65,6 +65,12 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
     refetchInterval: (q) => (q.state.data?.signedIn ? false : 3_000) });
   const signIn = useMutation({ mutationFn: useRpc(profileSignInRpc) });
   const needsSignIn = cleanProfile && profile.data?.signedIn !== true;
+  // The user's own Claude, signed in right after the tools (Sean, from Friday's Mac walk, 2026-10-13); asked every 3 s.
+  const readClaude = useRpc(claudeStatusRpc);
+  const claude = useQuery({ queryKey: ["setup.claude.status"], queryFn: () => readClaude({}), enabled: !!st.data?.tools.every((t) => t.state === "ok"),
+    refetchInterval: (q) => (q.state.data?.signedIn ? false : 3_000) });
+  const claudeSignIn = useMutation({ mutationFn: useRpc(claudeSignInRpc) });
+  const claudeIn = claude.data?.signedIn === true;
 
   // The welcome comes first on a computer that has not seen it (ticket 009); either button marks it seen for good.
   const readWelcome = useRpc(welcomeReadRpc);
@@ -108,16 +114,27 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         <Pressable accessibilityRole="button" style={s.quiet} onPress={() => st.refetch()}><Text style={s.quietText}>Check again</Text></Pressable>
       </View>}
       {!toolsOk && !doTools.data && <Text style={s.muted}>Tools you already have stay as they are. An old one is updated, a missing one is installed. Your other projects are not touched.</Text>}
+      {toolsOk && (claudeIn ? <Text style={s.good}>Signed in to Claude.</Text> : (
+        <View style={{ gap: 8 }}>
+          <Text style={s.p}>Now sign in to Claude. Your citizens run on Claude Code, and it needs your Claude account.</Text>
+          <Pressable accessibilityRole="button" style={[s.button, claudeSignIn.isPending && s.locked]} disabled={claudeSignIn.isPending} onPress={() => claudeSignIn.mutate({})}>
+            <Text style={s.buttonText}>Sign in to Claude</Text>
+          </Pressable>
+          {claudeSignIn.data && <Text style={claudeSignIn.data.started ? s.muted : s.bad}>{claudeSignIn.data.message}</Text>}
+          {claudeSignIn.isError && <Text style={s.bad}>{String(claudeSignIn.error)}</Text>}
+          <Text style={s.muted}>This screen sees the sign-in by itself, a few seconds after your browser says you are signed in.</Text>
+        </View>
+      ))}
 
       <Text style={s.h2}>2. Your invite</Text>
       {d.connected ? <Text style={s.good}>Your house is connected.</Text> : (
         <View style={{ gap: 8 }}>
           <Text style={s.muted}>Paste the code from your invite page.</Text>
           <TextInput accessibilityLabel="Invite code" style={s.input} value={code} onChangeText={setCode} autoCapitalize="none" autoCorrect={false} placeholder="Invite code" placeholderTextColor={c.foregroundMuted} />
-          <Pressable accessibilityRole="button" style={[s.button, (!toolsOk || code.trim().length < 8 || doConnect.isPending) && s.locked]} disabled={!toolsOk || code.trim().length < 8 || doConnect.isPending} onPress={() => doConnect.mutate({ code: code.trim() })}>
+          <Pressable accessibilityRole="button" style={[s.button, (!toolsOk || !claudeIn || code.trim().length < 8 || doConnect.isPending) && s.locked]} disabled={!toolsOk || !claudeIn || code.trim().length < 8 || doConnect.isPending} onPress={() => doConnect.mutate({ code: code.trim() })}>
             <Text style={s.buttonText}>{doConnect.isPending ? "Connecting…" : "Connect my house"}</Text>
           </Pressable>
-          {!toolsOk && <Text style={s.muted}>First get the tools above, then connect.</Text>}
+          {!toolsOk ? <Text style={s.muted}>First get the tools above, then connect.</Text> : !claudeIn && <Text style={s.muted}>First sign in to Claude above, then connect.</Text>}
           {doConnect.data && !doConnect.data.ok && <Text style={s.bad}>{doConnect.data.message}</Text>}
           {doConnect.isError && <Text style={s.bad}>{String(doConnect.error)}</Text>}
         </View>
