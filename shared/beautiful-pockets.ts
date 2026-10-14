@@ -5,6 +5,8 @@
 export const BEAUTIFUL_POCKETS = "beautiful-pockets";
 // Upstream's own id: a user who has it keeps it, and setup adds no second chat look beside it.
 export const BEAUTIFUL_CHAT = "beautiful-chat";
+// Written into a plugin's node_modules when its build finished, so a build cut off part-way is run again.
+export const BUILT = ".pockets-built";
 
 // Help's line on pasted pictures (ticket 022, the approved words): with the "Enhanced prompt bubble" on, its default, a
 // pasted picture does not show in the user's own message, because Paseo hands plugins the text only.

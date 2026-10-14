@@ -1,5 +1,6 @@
 // The real outside world for the setup run, inside Paseo: processes, the doorman, and Paseo itself.
 import { paseoError } from "./paseo-error.ts";
+import { BUILT } from "../shared/beautiful-pockets";
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -105,11 +106,16 @@ export function ops(paseo: PaseoApi): Ops {
     },
     // The same commit, fetched and built here with setup's PATH (Homebrew's npm on the Mac), into setup's own folder, then
     // added as a folder plugin, which Paseo does not build. Each failing step's own output is the reason.
+    // Its packages are large (about 250 MB), so each step has 15 minutes. A failed build leaves no half-built packages.
     async buildPlugin(dir, steps) {
       for (const [cmd, ...args] of steps) {
-        const r = exec(cmd, args, { cwd: dir });
-        if (r.status !== 0) throw new Error(`could not build it: ${`${r.stderr}\n${r.stdout}`.replace(/\s+/g, " ").trim().slice(-300) || `${cmd} was not found`}`);
+        const r = exec(cmd, args, { cwd: dir, timeout: 900_000 });
+        if (r.status !== 0) {
+          fs.rmSync(path.join(dir, "node_modules"), { recursive: true, force: true });
+          throw new Error(`could not build it: ${`${r.stderr}\n${r.stdout}`.replace(/\s+/g, " ").trim().slice(-300) || `${cmd} was not found`}`);
+        }
       }
+      fs.mkdirSync(path.join(dir, "node_modules"), { recursive: true }); fs.writeFileSync(path.join(dir, "node_modules", BUILT), "");
     },
     // Claude where setup finds it but Paseo, on its own PATH, does not (~/.local/bin on the Mac): Paseo gets the full path.
     async pinClaude() {

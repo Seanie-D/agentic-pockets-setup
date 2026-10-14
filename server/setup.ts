@@ -9,7 +9,7 @@ import { season } from "./seasonings.ts";
 import { applyExtrasOff, type Extra } from "./tools.ts";
 import { DEFAULT_MODE, tierFor, withTier, type Mode } from "../shared/mode.ts";
 import { CAFE, withOptOut } from "../shared/cafe.ts";
-import { BEAUTIFUL_CHAT, BEAUTIFUL_POCKETS } from "../shared/beautiful-pockets.ts";
+import { BEAUTIFUL_CHAT, BEAUTIFUL_POCKETS, BUILT } from "../shared/beautiful-pockets.ts";
 import { pieceHash } from "./pieces.ts";
 
 const SETUP_ID = "agentic-pockets-setup";   // this plugin's own Paseo id (paseo-plugin.json)
@@ -195,7 +195,8 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
     const why = (e: unknown) => String((e as Error)?.message ?? e);
     try {
       let build: string[][] = []; try { build = JSON.parse(fs.readFileSync(path.join(to, "paseo-plugin.json"), "utf8")).build ?? []; } catch { /* no manifest: nothing to build */ }
-      if (build.length && !fs.existsSync(path.join(to, "node_modules"))) await deps.ops.buildPlugin(to, build);
+      // Built means the build finished: its mark, not node_modules alone, which a cut-off build leaves half full.
+      if (build.length && !fs.existsSync(path.join(to, "node_modules", BUILT))) await deps.ops.buildPlugin(to, build);
       const { running } = await deps.ops.addPlugin(id, to);
       const added = chat ? "Added Beautiful Pockets to Paseo: a cleaner look for every chat, with tool cards closed until you open them." : "Added the house plugin to Paseo.";
       steps.push(running ? added : `${added} It starts the next time Paseo starts: quit Paseo and open it again.`);

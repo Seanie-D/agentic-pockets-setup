@@ -393,9 +393,15 @@ test("Beautiful Pockets: when it cannot be built, setup goes on, names why, and 
   assert.ok(w.log.some((l) => l.startsWith("plugin agentic-pockets")));
 });
 
-test("Beautiful Pockets: a folder already built is not built again", async () => {
+test("Beautiful Pockets: a folder already built is not built again; a half-built one is", async () => {
+  const half = world();
+  fs.mkdirSync(path.join(half.root, "plugins", "beautiful-pockets", "node_modules"), { recursive: true });
+  fs.writeFileSync(path.join(half.root, "plugins", "beautiful-pockets", "paseo-plugin.json"), '{ "id": "beautiful-pockets", "build": [["npm", "ci"]] }');
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: half.root, home: half.home }, half.deps);
+  assert.ok(half.log.some((l) => l.startsWith("built beautiful-pockets")), "node_modules with no built mark: a build that was cut off");
   const w = world();
   fs.mkdirSync(path.join(w.root, "plugins", "beautiful-pockets", "node_modules"), { recursive: true });
+  fs.writeFileSync(path.join(w.root, "plugins", "beautiful-pockets", "node_modules", ".pockets-built"), "");
   fs.writeFileSync(path.join(w.root, "plugins", "beautiful-pockets", "paseo-plugin.json"), '{ "id": "beautiful-pockets", "build": [["npm", "ci"]] }');
   await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
   assert.ok(!w.log.some((l) => l.startsWith("built beautiful-pockets")), w.log.join("\n"));
