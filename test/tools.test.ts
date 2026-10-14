@@ -311,3 +311,21 @@ test("Claude Code still too old because Anthropic's own older install runs first
   assert.equal(r.state, "ok"); assert.equal(r.action, "updated"); assert.equal(r.have, "2.1.300");
   assert.equal(r.message, undefined);
 });
+
+// Sean, 16:13 CDT: "claude update did NOT help John's case, but it DID help Nick's." A Homebrew copy updates only through
+// brew, so an old Homebrew copy that runs first gets the brew update line, never claude update and never a removal.
+test("an old Homebrew copy that runs first: setup says it updates only through Homebrew", () => {
+  const BREW = "/usr/local/bin/claude";
+  const VER: Record<string, string> = { claude: "2.1.140", [BREW]: "2.1.140", node: "24.16.0", git: "2.43.0", paseo: "0.11.2" };
+  const run = (cmd: string, args: string[]) => {
+    if (args[0] === "--version" && cmd in VER) return { status: 0, stdout: `${VER[cmd]} (x)\n` };
+    if (cmd === "which" && args.join(" ") === "-a claude") return { status: 0, stdout: `${BREW}\n` };
+    if (cmd === "sh") return { status: 0, stdout: "" };
+    return { status: 1, stdout: "" };
+  };
+  const r = installTools(run, "darwin", () => true, () => "/usr/local/Caskroom/claude-code/2.1.140/claude").find((t) => t.name === "claude")!;
+  assert.match(r.message!, /\(2\.1\.140, from Homebrew\) runs first/);
+  assert.match(r.message!, /Update the old copy/);
+  assert.match(r.message!, /brew upgrade --cask claude-code/);
+  assert.doesNotMatch(r.message!, /claude update|uninstall/);
+});

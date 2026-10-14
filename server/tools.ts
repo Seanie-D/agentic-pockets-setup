@@ -76,7 +76,6 @@ function claudeCopies(run: Run, platform: NodeJS.Platform, resolve: (p: string) 
 }
 const REMOVE: Record<string, (platform: NodeJS.Platform) => string> = {
   npm: (p) => `${p === "win32" ? "" : "sudo "}npm uninstall -g @anthropic-ai/claude-code`,
-  Homebrew: () => "brew uninstall --cask claude-code",
 };
 // The plain-words message when Claude Code is still too old after the install: which copy runs first and why, the newer
 // copy when there is one, and how to remove the old one. Setup removes nothing itself.
@@ -85,8 +84,12 @@ function stillOld(copies: Copy[], need: string, platform: NodeJS.Platform): stri
   if (!first || (first.version && !older(first.version, need))) return null;
   const newer = copies.find((c) => c.version && !older(c.version, need));
   const what = [first.version, first.from && `${first.from === "npm" ? "an npm install" : `from ${first.from}`}`].filter(Boolean).join(", ");
-  const how = first.from === "Anthropic's installer" ? ` It can update itself: run this in ${platform === "win32" ? "a terminal" : "Terminal"}: claude update` : first.from && REMOVE[first.from] ? ` To remove it, run this in ${platform === "win32" ? "a terminal" : "Terminal"}: ${REMOVE[first.from](platform)}` : " Ask the person who invited you how to remove it.";
-  return `Claude Code is still too old: an older copy at ${first.at}${what ? ` (${what})` : ""} runs first.${newer ? ` The new copy is at ${newer.at} (${newer.version}).` : ""} ${first.from === "Anthropic's installer" ? "Update" : "Remove"} the old copy, then quit Paseo, open it again, and press Check again.${how}`;
+  const term = platform === "win32" ? "a terminal" : "Terminal";
+  // How each kind updates (Sean, 16:13 CDT: "claude update did NOT help John's case, but it DID help Nick's"): Anthropic's
+  // own copy updates itself; a Homebrew copy only through brew; an npm copy is removed, since a newer copy is here.
+  const update = first.from === "Anthropic's installer" ? "It can update itself" : first.from === "Homebrew" ? "It updates only through Homebrew" : null;
+  const how = update ? ` ${update}: run this in ${term}: ${first.from === "Homebrew" ? "brew upgrade --cask claude-code" : "claude update"}` : first.from && REMOVE[first.from] ? ` To remove it, run this in ${platform === "win32" ? "a terminal" : "Terminal"}: ${REMOVE[first.from](platform)}` : " Ask the person who invited you how to remove it.";
+  return `Claude Code is still too old: an older copy at ${first.at}${what ? ` (${what})` : ""} runs first.${newer ? ` The new copy is at ${newer.at} (${newer.version}).` : ""} ${update ? "Update" : "Remove"} the old copy, then quit Paseo, open it again, and press Check again.${how}`;
 }
 
 export function installTools(run: Run, platform: NodeJS.Platform, writable: (dir: string) => boolean = canWrite, resolve: (p: string) => string = fs.realpathSync): Installed[] {
