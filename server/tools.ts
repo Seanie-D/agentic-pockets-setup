@@ -60,7 +60,36 @@ const lastLine = (out: string) => out.trim().split(/\r?\n/).filter(Boolean).pop(
 // takes the route without Homebrew.
 const canWrite = (dir: string) => { try { fs.accessSync(dir, fs.constants.W_OK); return true; } catch { return false; } };
 
-export function installTools(run: Run, platform: NodeJS.Platform, writable: (dir: string) => boolean = canWrite): Installed[] {
+// Every copy of Claude Code this setup can reach, the one that runs first at the top, each with its version and where it
+// came from (from where its command really lives). Nick's setup, 2026-10-14: the installer's new copy went to ~/.local/bin
+// and an old npm copy in /usr/local/bin still ran first, so the check said "still too old" after the install.
+interface Copy { at: string; version: string | null; from: "npm" | "Homebrew" | "Anthropic's installer" | null }
+function claudeCopies(run: Run, platform: NodeJS.Platform, resolve: (p: string) => string): Copy[] {
+  const r = platform === "win32" ? run("where", ["claude"]) : run("which", ["-a", "claude"]);
+  if (r.status !== 0) return [];
+  return [...new Set(r.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean))].map((at) => {
+    let real = at; try { real = resolve(at); } catch { /* a broken link: its own path */ }
+    const v = run(at, ["--version"]);
+    const from = /node_modules[\\/]@anthropic-ai[\\/]claude-code/.test(real) ? "npm" : /Caskroom/.test(real) ? "Homebrew" : /[\\/]\.local[\\/]share[\\/]claude[\\/]/.test(real) ? "Anthropic's installer" : null;
+    return { at, version: v.status === 0 ? ver(v.stdout) : null, from };
+  });
+}
+const REMOVE: Record<string, (platform: NodeJS.Platform) => string> = {
+  npm: (p) => `${p === "win32" ? "" : "sudo "}npm uninstall -g @anthropic-ai/claude-code`,
+  Homebrew: () => "brew uninstall --cask claude-code",
+};
+// The plain-words message when Claude Code is still too old after the install: which copy runs first and why, the newer
+// copy when there is one, and how to remove the old one. Setup removes nothing itself.
+function stillOld(copies: Copy[], need: string, platform: NodeJS.Platform): string | null {
+  const first = copies[0];
+  if (!first || (first.version && !older(first.version, need))) return null;
+  const newer = copies.find((c) => c.version && !older(c.version, need));
+  const what = [first.version, first.from && `${first.from === "npm" ? "an npm install" : `from ${first.from}`}`].filter(Boolean).join(", ");
+  const how = first.from && REMOVE[first.from] ? ` To remove it, run this in ${platform === "win32" ? "a terminal" : "Terminal"}: ${REMOVE[first.from](platform)}` : " Ask the person who invited you how to remove it.";
+  return `Claude Code is still too old: an older copy at ${first.at}${what ? ` (${what})` : ""} runs first.${newer ? ` The new copy is at ${newer.at} (${newer.version}).` : ""} Remove the old copy, then quit Paseo, open it again, and press Check again.${how}`;
+}
+
+export function installTools(run: Run, platform: NodeJS.Platform, writable: (dir: string) => boolean = canWrite, resolve: (p: string) => string = fs.realpathSync): Installed[] {
   const brew = platform === "darwin" && run("brew", ["--version"]).status === 0;
   const brewPrefix = brew ? run("brew", ["--prefix"]).stdout.trim() : "";
   const brewTheirs = brew && !!brewPrefix && !writable(brewPrefix);
@@ -97,6 +126,8 @@ export function installTools(run: Run, platform: NodeJS.Platform, writable: (dir
     } else return { ...before, action: "not done", message: `Install ${t.name} ${t.need} or newer with your system's package manager.` };
     const after = checkOne(run, t);
     const action = after.state !== "ok" ? "not done" : before.state === "missing" ? "installed" : "updated";
+    const shadowed = t.name === "claude" && after.state === "old" ? stillOld(claudeCopies(run, platform, resolve), t.need, platform) : null;
+    if (shadowed) return { ...after, action, message: shadowed };
     if (after.state !== "ok") return { ...after, action, message: `${t.name} is still ${after.state === "old" ? "too old" : "missing"} after the install.${why ? ` The installer said: ${why}` : ""}` };
     return { ...after, action, ...(wholeComputer ? { message: `${t.name} has no installer for one user, so it was installed for the whole computer. That is why Windows asked you to allow changes.` } : {}) };
   });

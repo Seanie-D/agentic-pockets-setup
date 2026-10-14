@@ -266,3 +266,25 @@ test("a Claude Code too old for the release's models is old, so setup offers the
   const c = checkTools(run).find((t) => t.name === "claude")!;
   assert.equal(c.state, "old"); assert.equal(c.have, "2.1.140"); assert.equal(c.need, "2.1.280");
 });
+
+// Nick's setup on 1.0.1, 2026-10-14 15:52 CDT: Claude Code 2.1.220 read too old, Install ran, and the check said
+// "claude is still too old after the install": the installer's new copy went to ~/.local/bin, and an old npm copy in
+// /usr/local/bin still ran first. Setup now names every copy, the one that runs first and where it came from, and how
+// to remove it; it removes nothing itself.
+test("Claude Code still too old after the install: setup names the old copy that runs first and how to remove it", () => {
+  const OLD = "/usr/local/bin/claude", NEW = "/Users/nick/.local/bin/claude";
+  const real: Record<string, string> = { [OLD]: "/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js", [NEW]: "/Users/nick/.local/share/claude/versions/2.1.290" };
+  const VER: Record<string, string> = { claude: "2.1.220", [OLD]: "2.1.220", [NEW]: "2.1.290", node: "24.16.0", git: "2.43.0", paseo: "0.11.2" };
+  const run = (cmd: string, args: string[]) => {
+    if (args[0] === "--version" && cmd in VER) return { status: 0, stdout: `${VER[cmd]} (x)\n` };
+    if (cmd === "which" && args.join(" ") === "-a claude") return { status: 0, stdout: `${OLD}\n${NEW}\n` };
+    if (cmd === "sh") return { status: 0, stdout: "" };   // the installer runs, and the old copy still runs first
+    return { status: 1, stdout: "" };
+  };
+  const r = installTools(run, "darwin", () => true, (p) => real[p] ?? p).find((t) => t.name === "claude")!;
+  assert.equal(r.action, "not done");
+  assert.match(r.message!, /\/usr\/local\/bin\/claude \(2\.1\.220, an npm install\) runs first/);
+  assert.match(r.message!, /\/Users\/nick\/\.local\/bin\/claude \(2\.1\.290\)/);
+  assert.match(r.message!, /sudo npm uninstall -g @anthropic-ai\/claude-code/);
+  assert.match(r.message!, /quit Paseo, open it again, and press Check again/);
+});
