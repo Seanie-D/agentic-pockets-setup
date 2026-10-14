@@ -301,6 +301,8 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   // The update system, ticket 01: the release this house was built from, each piece's hash as released and, for what is
   // here, as placed (placing fills in the owner's name), so a later compare tells our changes from the house's own.
   // A piece recorded before keeps its record; a release with no RELEASE.json (older ones) records nothing.
+  // `release.id` is the release the house was built from, and nothing moves it: an update moves each taken piece's own
+  // record, `setupRef`, and `updates.line` (Friday's question on the two-release check, 2026-10-14).
   let release = rec.release as { id: string; setupRef: string | null; pieces: Record<string, { hash: string; release: string; placed?: string }> } | undefined;
   let m: { id?: string; setup?: { ref?: string }; pieces?: Record<string, { hash: string }> } | null = null;
   try { m = JSON.parse(fs.readFileSync(path.join(upstream, "RELEASE.json"), "utf8")); } catch { /* an older release */ }
