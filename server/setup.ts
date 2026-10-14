@@ -40,7 +40,9 @@ export interface SetupResult { ok: boolean; message: string; steps: string[]; fi
 // back to finish, and says they can ask it anything at any time.
 // Auto is Claude's own mode (any Claude account: claude, claude-house, …); Codex and OpenCode keep their default.
 export const deskMode = (provider: string): string | undefined => provider.startsWith("claude") ? "auto" : undefined;
-export const setupLine = (houseFile: string) => `[SETUP] Setup has just started and is not finished yet. Say hello in one or two plain sentences, tell the user they can ask you anything at any time, and send them back to the Agentic Pockets setup screen to finish it. Setup finishes later, on that screen: from then on, before you say anything about setup, read \`setupDone\` in ${houseFile}. When it is true, setup is done.`;
+// The first desk's first line. The user reads its answer after pressing Finish setup (walk 5, the owner: a hello that
+// said "Setup is not finished yet" misled), so it asks for a hello to a house that is ready.
+export const setupLine = (houseFile: string) => `[SETUP] This house was just made. Say hello in one or two plain sentences, as to a house that is ready, and tell the user they can ask you anything at any time. They read your hello after they press Finish setup on the setup screen. Before you say anything about setup later, read \`setupDone\` in ${houseFile}. When it is true, setup is done.`;
 const DEFAULT_MODEL: Record<string, string> = { claude: "claude-opus-5-5", "claude-house": "claude-opus-5-5" };
 const HOUSE_MANAGER = "Jarvis";
 

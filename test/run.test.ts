@@ -557,3 +557,13 @@ test("Auto mode on a Claude account only: the first desk opens in it, and a Code
   assert.equal(rec.desks.Verro.mode, "auto");
   assert.equal("mode" in rec.desks.Vision, false);
 });
+
+// Walk 4 item 12, and walk 5 (Sean, 2026-10-14 10:48 CDT): "I dont want a user to be misled to feel that they MUST complete
+// the tutorial". The first desk's hello was "Setup is not finished yet", read after Finish setup. The line asks for a
+// hello to a house that is ready, and still tells the citizen to read setupDone before it says anything about setup.
+test("the first desk's line asks for a hello to a ready house, not a setup reminder", async () => {
+  const { setupLine } = await import("../server/setup.ts");
+  const l = setupLine("/Users/nick/agentic-pockets/house.json");
+  assert.doesNotMatch(l, /not finished|send them back|finish it/i, l);
+  assert.match(l, /^\[SETUP\] /); assert.match(l, /Say hello in one or two plain sentences/); assert.match(l, /setupDone/);
+});
