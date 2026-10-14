@@ -82,3 +82,14 @@ test("a press that joined a running job gets that job's result when it ends; it 
   assert.equal(await job("first", run, "busy"), "run 1");
   assert.equal(starts, 1);
 });
+
+// The review of re-walk 3's fixes, 2026-10-14: a screen rebuilt while the house is made must not offer Start again, so
+// the status call says whether a job is running.
+test("a job says whether it is running, so a rebuilt screen shows the loading page", async () => {
+  const job = joinable<string>(10);
+  assert.equal(job.running(), false);
+  const p = job("p", () => later(60, "done"), "busy");
+  assert.equal(job.running(), true);
+  await p; await later(70, null);
+  assert.equal(job.running(), false);
+});

@@ -7,13 +7,15 @@ import { checkTools, installTools, listExtras } from "./server/tools";
 import { deps, discussDeps, exec, rewardDeps, startSignIn } from "./server/real";
 import { profileDir, signedIn, signedInTo } from "./server/profile";
 import { ask, discuss } from "./server/discuss";
-import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc, profileStatusRpc, profileSignInRpc, claudeStatusRpc, claudeSignInRpc, welcomeDismissRpc, welcomeReadRpc, modeSetRpc, askRpc } from "./shared/contracts";
+import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc, profileStatusRpc, profileSignInRpc, claudeStatusRpc, claudeSignInRpc, welcomeDismissRpc, welcomeReadRpc, modeSetRpc, askRpc, firstTurnRpc } from "./shared/contracts";
 import { markWelcomeSeen, welcomeSeen } from "./server/welcome";
 import { markSeen, readTutorial, realProbe, stateTicks } from "./server/tutorial";
 import { rewardPass } from "./server/reward";
 import { askHelp, readGlossary } from "./server/help";
 import { helpAskRpc, helpGlossaryRpc } from "./shared/contracts";
 import { joinable } from "./shared/job";
+import { clearForm, readForm, saveForm, saveResult } from "./server/form";
+import { firstTurn, type DeskRecord } from "./server/first-turn";
 
 // The house goes in the user's home folder, beside anything they already have (ticket 004 Q7: earlier projects untouched).
 const ROOT = path.join(os.homedir(), "agentic-pockets");
@@ -27,6 +29,9 @@ const WAIT_MS = 20_000;
 const BUSY = { ok: false, message: "Still working…", steps: [] as string[], running: true };
 // A job's own failure is an answer, so the screen's repeat calls (shared/job.ts untilDone) never start a second run.
 const failed = (e: unknown) => ({ ok: false, message: `Setup stopped: ${String((e as Error)?.message ?? e).slice(0, 300)}`, steps: [] as string[] });
+
+// The last Start's form, and what it made only while that house is still here (a house deleted before Finish is not good to go).
+const started = () => { const f = readForm(os.homedir()); return f && !fs.existsSync(path.join(ROOT, "house.json")) ? { ...f, result: null } : f; };
 
 export default function contribute(server: PluginServerContext) {
   const toolsJob = joinable<{ tools: ReturnType<typeof installTools>; running?: boolean; failed?: string }>(WAIT_MS);
@@ -46,7 +51,8 @@ export default function contribute(server: PluginServerContext) {
     return { tools: checkTools(exec), extras: listExtras(os.homedir()), root: ROOT, connected: fs.existsSync(path.join(ROOT, ".upstream")),
       packs: packsIn(ROOT), accounts: accounts.length ? accounts : ["claude"], setupDone: record().setupDone === true,
       mode: record().mode === "always-on" ? "always-on" as const : "on-demand" as const,
-      cafe: await paseo.config.get().then(({ config }) => !!(config as { plugins?: Record<string, unknown> }).plugins?.["paseo-cafe"]).catch(() => false) };
+      cafe: await paseo.config.get().then(({ config }) => !!(config as { plugins?: Record<string, unknown> }).plugins?.["paseo-cafe"]).catch(() => false),
+      installing: installJob.running(), started: record().setupDone === true ? null : started() };
   });
   server.handle(welcomeReadRpc, async () => ({ seen: welcomeSeen(os.homedir()), server: SERVER_START }));
   server.handle(welcomeDismissRpc, async () => { markWelcomeSeen(os.homedir(), new Date().toISOString()); return { seen: true }; });
@@ -66,13 +72,18 @@ export default function contribute(server: PluginServerContext) {
   server.handle(modeSetRpc, async ({ mode }) => setMode(ROOT, mode));
   server.handle(askRpc, async ({ topic }, { paseo }) => ask(ROOT, topic, discussDeps(paseo)));
   server.handle(installRpc, async ({ userName, citizens, accounts, extrasOff, cleanProfile, mode, cafe, run }, { paseo }) => {
+    // Kept before the sign-in check, so a refused Start keeps its picks too (Sean, re-walk 3, 2026-10-14 09:14 CDT).
+    saveForm(os.homedir(), { userName, citizens, accounts, extrasOff, cleanProfile, mode, cafe });
     // Claude must be signed in first, the user's own or the clean profile's: a signed-out one greets the user with "Not logged in".
     if (!cleanProfile && !signedInTo(exec, null)) return { ok: false, message: "Sign in to Claude first: step 1, after the tools.", steps: [] };
     if (cleanProfile && !signedIn(exec, os.homedir())) return { ok: false, message: "Sign in to Claude for your house first, or switch the clean profile off.", steps: [] };
-    return installJob(run, () => install({ paseoHome: process.env.PASEO_HOME, code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, cleanProfile, mode, cafe, root: ROOT, home: os.homedir() }, deps(paseo)).catch(failed), BUSY);
+    return installJob(run, () => install({ paseoHome: process.env.PASEO_HOME, code: "", userName, citizens, accounts, extras: listExtras(os.homedir()), extrasOff, cleanProfile, mode, cafe, root: ROOT, home: os.homedir() }, deps(paseo))
+      .then((r) => { if (r.ok) saveResult(os.homedir(), r); return r; }).catch(failed), BUSY);
   });
+  server.handle(firstTurnRpc, async ({ agentId }, { paseo }) => firstTurn(discussDeps(paseo).records().find((r) => r.id === agentId) as DeskRecord | undefined));
   server.handle(finishRpc, async () => {
     const rec = record(); fs.writeFileSync(path.join(ROOT, "house.json"), JSON.stringify({ ...rec, setupDone: true, updatedAt: new Date().toISOString() }, null, 2) + "\n");
+    clearForm(os.homedir());
     return { ok: true };
   });
   server.handle(helpGlossaryRpc, async () => ({ terms: readGlossary(ROOT) }));

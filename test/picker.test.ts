@@ -2,7 +2,7 @@
 // greys him out; going back to one unticks him and leaves him free.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { emptyPick, modeAfterSetup, toggle, view } from "../shared/picker.ts";
+import { emptyPick, pickFrom, toggle, view } from "../shared/picker.ts";
 
 test("one citizen: Ultron is free, and unticked", () => {
   const v = view(toggle(emptyPick(), "Verro"));
@@ -26,10 +26,12 @@ test("only the four offered packs and Ultron can be ticked", () => {
   assert.deepEqual(view(toggle(emptyPick(), "Butler")).citizens, []);
 });
 
-// Sean's Mac re-walk, 2026-10-13 16:43 CDT: "You're good to go!" with one citizen still showed "How your citizens run"
-// at the bottom, "which is weird". With one citizen the choice stays on its step; with two or more it is offered again.
-test("the good-to-go screen offers how the citizens run only for two or more citizens", () => {
-  assert.equal(modeAfterSetup(toggle(emptyPick(), "Verro")), false, "one citizen");
-  assert.equal(modeAfterSetup(toggle(toggle(emptyPick(), "Verro"), "Ultron")), true, "a citizen and Ultron by hand");
-  assert.equal(modeAfterSetup(toggle(toggle(emptyPick(), "Verro"), "Vision")), true, "two, and Ultron with them");
+// Sean, re-walk 3, 2026-10-14 09:14 CDT: "If a failed start up install happens, we need to keep the citizens that were
+// toggled previously still checked." The citizens a Start sent are kept by the server; the picker is rebuilt from them.
+test("the picker is rebuilt from the citizens a Start sent, Ultron by hand only when one was picked", () => {
+  for (const p of [toggle(emptyPick(), "Verro"), toggle(toggle(emptyPick(), "Verro"), "Ultron"), toggle(toggle(emptyPick(), "Vision"), "Verro")])
+    assert.deepEqual(view(pickFrom(view(p).citizens)).citizens, view(p).citizens);
+  assert.equal(pickFrom(["Ultron", "Verro"]).ultronByHand, true);
+  assert.equal(pickFrom(["Ultron", "Verro", "Vision"]).ultronByHand, false, "locked on, not by hand");
+  assert.deepEqual(pickFrom(["Jarvis", "Butler"]).packs, [], "only the offered packs");
 });

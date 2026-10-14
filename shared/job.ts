@@ -9,7 +9,8 @@ export function joinable<R>(waitMs: number) {
   let running: { runs: Set<string>; done: Promise<void> } | null = null;
   let ended: { runs: Set<string>; ok: true; value: R } | { runs: Set<string>; ok: false; error: unknown } | null = null;
   const give = (): R => { const e = ended!; if (!e.ok) throw e.error; return e.value; };
-  return async (run: string, start: () => Promise<R>, busy: R): Promise<R> => {
+  // running(): whether a job is at work now, so a screen rebuilt mid-job shows the loading page, not Start again.
+  return Object.assign(async (run: string, start: () => Promise<R>, busy: R): Promise<R> => {
     if (!running && ended?.runs.has(run)) return give();
     if (running) running.runs.add(run);
     else {
@@ -23,7 +24,7 @@ export function joinable<R>(waitMs: number) {
     await Promise.race([mine.done, new Promise<void>((r) => { timer = setTimeout(r, waitMs); })]);
     clearTimeout(timer);
     return running !== mine && ended?.runs === mine.runs ? give() : busy;
-  };
+  }, { running: () => running !== null });
 }
 
 // Paseo's own words when a plugin call outlives its 30 seconds: on the daemon "Plugin RPC timed out", on the screen

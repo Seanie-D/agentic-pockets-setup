@@ -9,12 +9,18 @@ const Extra = z.object({ id: z.string(), kind: z.enum(["hook", "skill", "agent",
   switchable: z.boolean(), file: z.string().optional() });
 // running: the step is still at work (shared/job.ts); the screen calls again, and the same job answers.
 const Result = z.object({ ok: z.boolean(), message: z.string(), steps: z.array(z.string()), running: z.boolean().optional() });
+const FirstDesk = z.object({ citizen: z.string(), agentId: z.string().nullable() });
+const Mode = z.enum(["on-demand", "always-on"]);
+// What the last Start sent and made, kept by the server until Finish (server/form.ts), so a rebuilt screen keeps it.
+const Form = z.object({ userName: z.string(), citizens: z.array(z.string()), accounts: z.record(z.string(), z.string()), extrasOff: z.array(z.string()),
+  cleanProfile: z.boolean(), mode: Mode, cafe: z.boolean() });
 
 export const status = defineRpc({
   name: "setup.status",
   input: z.object({}),
   output: z.object({ tools: z.array(Tool), extras: z.array(Extra), root: z.string(), connected: z.boolean(),
-    packs: z.array(z.object({ name: z.string(), hello: z.string() })), accounts: z.array(z.string()), setupDone: z.boolean(), mode: z.enum(["on-demand", "always-on"]), cafe: z.boolean() }),
+    packs: z.array(z.object({ name: z.string(), hello: z.string() })), accounts: z.array(z.string()), setupDone: z.boolean(), mode: Mode, cafe: z.boolean(),
+    installing: z.boolean(), started: z.object({ form: Form, result: Result.extend({ firstDesk: FirstDesk.optional() }).nullable() }).nullable() }),
 });
 // run: the screen's id for one press (shared/job.ts), so a repeated call of that press joins its job.
 export const installToolsRpc = defineRpc({ name: "setup.tools.install", input: z.object({ run: z.string().default("") }), output: z.object({ tools: z.array(Installed), running: z.boolean().optional(), failed: z.string().optional() }) });
@@ -24,8 +30,11 @@ export const installRpc = defineRpc({
   input: z.object({ userName: z.string().min(1), citizens: z.array(z.string()).min(1), accounts: z.record(z.string(), z.string()),
     extrasOff: z.array(z.string()).default([]), cleanProfile: z.boolean().default(false), mode: z.enum(["on-demand", "always-on"]).default("on-demand"), cafe: z.boolean().default(false),
     run: z.string().default("") }),
-  output: Result.extend({ firstDesk: z.object({ citizen: z.string(), agentId: z.string().nullable() }).optional() }),
+  output: Result.extend({ firstDesk: FirstDesk.optional() }),
 });
+// How the first desk's first turn went, from Paseo's record of it (server/first-turn.ts).
+export const firstTurnRpc = defineRpc({ name: "setup.firstturn.read", input: z.object({ agentId: z.string() }),
+  output: z.object({ state: z.enum(["starting", "done", "failed"]), message: z.string().optional() }) });
 // The welcome take-over (ticket 009): whether this computer has seen it, and marking it seen.
 export const welcomeReadRpc = defineRpc({ name: "setup.welcome.read", input: z.object({}), output: z.object({ seen: z.boolean(), server: z.string() }) });
 export const welcomeDismissRpc = defineRpc({ name: "setup.welcome.dismiss", input: z.object({}), output: z.object({ seen: z.boolean() }) });

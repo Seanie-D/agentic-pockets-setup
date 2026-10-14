@@ -3,9 +3,9 @@
 import type { PluginScreenProps } from "@getpaseo/plugin/client";
 import { useRpc } from "@getpaseo/plugin/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { claudeSignInRpc, claudeStatusRpc, connectRpc, finishRpc, installRpc, installToolsRpc, modeSetRpc, profileSignInRpc, profileStatusRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
+import { claudeSignInRpc, claudeStatusRpc, connectRpc, finishRpc, installRpc, installToolsRpc, firstTurnRpc, profileSignInRpc, profileStatusRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
 import { DEFAULT_MODE, type Mode } from "../shared/mode";
 import { untilDone } from "../shared/job";
 import { ModeChoice } from "./mode";
@@ -13,7 +13,7 @@ import { CAFE } from "../shared/cafe";
 import { LeftAlone, Welcome } from "./welcome";
 import { askToPoint } from "../shared/pointer";
 import { TutorialView } from "./tutorial";
-import { PACKS, emptyPick, modeAfterSetup, toggle, view, type Pick } from "../shared/picker";
+import { PACKS, emptyPick, pickFrom, toggle, view, type Pick } from "../shared/picker";
 import { openExternal } from "./web";
 import { HELP } from "../shared/help-links";
 import { Hello } from "./hello";
@@ -45,7 +45,8 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   }), [c, layout.compact]);
 
   const readStatus = useRpc(status);
-  const st = useQuery({ queryKey: ["setup.status"], queryFn: () => readStatus({}) });
+  // Asked again every 3 s while the server is making the house, so a screen rebuilt mid-install follows it to the end.
+  const st = useQuery({ queryKey: ["setup.status"], queryFn: () => readStatus({}), refetchOnMount: "always", refetchInterval: (q) => (q.state.data?.installing ? 3_000 : false) });
   // A long step answers "still working" and is asked again until it is done (shared/job.ts): one press, one run.
   const doTools = useMutation({ mutationFn: untilDone(useRpc(installToolsRpc)), onSuccess: () => st.refetch() });
   const doConnect = useMutation({ mutationFn: untilDone(useRpc(connectRpc)), onSuccess: () => st.refetch() });
@@ -59,7 +60,6 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const [cafe, setCafe] = useState(false);   // the Paseo Cafe: offered, default off (ticket 009)
   // The form starts from the house's own mode (a screen reopened before Finish), until the user picks.
   const [modePick, setMode] = useState<Mode | null>(null);
-  const doMode = useMutation({ mutationFn: useRpc(modeSetRpc), onSuccess: () => st.refetch() });
   // The clean profile (ticket 004): offered only when the user has Claude hooks of their own; default no.
   const [cleanProfile, setCleanProfile] = useState(false);
   const readProfile = useRpc(profileStatusRpc);
@@ -73,6 +73,16 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const claudeSignIn = useMutation({ mutationFn: useRpc(claudeSignInRpc) });
   const claudeIn = claude.data?.signedIn === true;
   const needsSignIn = cleanProfile ? profile.data?.signedIn !== true : claude.data?.signedIn !== true;
+  // A rebuilt screen starts empty (a desk opens beside it), so the last Start's form comes back from the server, once,
+  // from the first status the screen reads; a later read never overwrites the user's edits (Sean, re-walk 3,
+  // 2026-10-14 09:14 CDT: "keep the citizens that were toggled previously still checked").
+  const [seeded, setSeeded] = useState(false);
+  useEffect(() => {
+    if (seeded || !st.data || !st.isFetchedAfterMount) return;   // not a cached read from before the screen was rebuilt
+    const f = st.data.started?.form;
+    if (f) { setUserName(f.userName); setPick(pickFrom(f.citizens)); setAccounts(f.accounts); setExtrasOff(f.extrasOff); setCleanProfile(f.cleanProfile); setMode(f.mode); setCafe(f.cafe); }
+    setSeeded(true);
+  }, [seeded, st.data, st.isFetchedAfterMount]);
 
   // The welcome comes first on a computer that has not seen it (ticket 009); either button marks it seen for good.
   const readWelcome = useRpc(welcomeReadRpc);
@@ -83,7 +93,8 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   if (welcome.data?.seen === false) return <Welcome s={s} onGo={() => dismiss.mutate({})} onLeave={() => { setLeft(true); askToPoint(); dismiss.mutate({}); }} />;
 
   const d = st.data;
-  if (!d) return <View style={s.screen}><View style={s.body}><Text style={s.muted}>{st.isError ? `Setup could not read this computer: ${String(st.error)}` : "Looking at this computer…"}</Text></View></View>;
+  // Until the fresh read has seeded the form, nothing can be edited that the seed would overwrite.
+  if (!d || !seeded) return <View style={s.screen}><View style={s.body}><Text style={s.muted}>{st.isError ? `Setup could not read this computer: ${String(st.error)}` : "Looking at this computer…"}</Text></View></View>;
   const v = view(pick);
   const mode: Mode = modePick ?? d.mode ?? DEFAULT_MODE;
   const offered = d.packs.filter((p) => (PACKS as readonly string[]).includes(p.name));
@@ -91,12 +102,14 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const jarvisPack = d.packs.find((p) => p.name === "Jarvis");
   const accountOf = (n: string) => accounts[n] ?? d.accounts[0] ?? "claude";
   const toolsOk = d.tools.every((t) => t.state === "ok");
-  const installed = doInstall.data?.ok === true;
+  // What this Start made, or, on a rebuilt screen, what the last one made (kept by the server until Finish).
+  const made = doInstall.data?.ok === true ? doInstall.data : d.started?.result?.ok === true ? d.started.result : null;
+  const installed = made !== null;
 
   // The owner's 15:51 walk, 2026-10-13: start and finish are whole screens. While the house is made, a loading screen
   // with nothing to change; then "You're good to go!" with Finish setup; then the tutorial on a screen of its own, with
   // no setup step above it ("It needs to be an entirely new screen, no way to tweak the setup things").
-  if (doInstall.isPending) return (
+  if (doInstall.isPending || d.installing) return (
     <View style={s.screen}><View style={s.body}>
       <Text style={s.h1}>Setting up your house…</Text>
       <Text style={s.p}>This can take a few minutes. Keep this screen open; there is nothing to press.</Text>
@@ -112,14 +125,8 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   if (installed) return (
     <ScrollView style={s.screen}><View style={s.body}>
       <Text style={s.h1}>You're good to go!</Text>
-      {doInstall.data?.steps.map((x) => <Text key={x} style={s.muted}>✓ {x}</Text>)}
-      <Text style={s.p}>{label(doInstall.data?.firstDesk?.citizen ?? "")} has said hello in their workspace. Open it from the sidebar on the left.</Text>
-      {modeAfterSetup(pick) && <>
-        <Text style={s.h2}>How your citizens run</Text>
-        <ModeChoice s={s} mode={d.mode} onPick={(m) => doMode.mutate({ mode: m })} busy={doMode.isPending} askable navigation={navigation} />
-        {doMode.data && !doMode.data.ok && <Text style={s.bad}>{doMode.data.message}</Text>}
-        {doMode.isError && <Text style={s.bad}>{String(doMode.error)}</Text>}
-      </>}
+      {made?.steps.map((x) => <Text key={x} style={s.muted}>✓ {x}</Text>)}
+      <FirstTurnLine s={s} citizen={label(made?.firstDesk?.citizen ?? "")} agentId={made?.firstDesk?.agentId ?? null} />
       <Pressable accessibilityRole="button" style={[s.button, doFinish.isPending && s.locked]} disabled={doFinish.isPending} onPress={() => doFinish.mutate({})}><Text style={s.buttonText}>Finish setup</Text></Pressable>
       {doFinish.isError && <Text style={s.bad}>{String(doFinish.error)}</Text>}
     </View></ScrollView>
@@ -264,4 +271,21 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
 
     </View></ScrollView>
   );
+}
+
+// The first desk's first message, as Paseo's record of it shows (Sean, re-walk 3, 2026-10-14 09:14 CDT: the page said
+// hello when the first turn had failed). Asked every 3 s until it is done or failed. The mode choice is not offered
+// here: it was on its own step already (Sean, the same walk: "should not have the selector … again").
+function FirstTurnLine({ s, citizen, agentId }: { s: { p: object; bad: object }; citizen: string; agentId: string | null }) {
+  const read = useRpc(firstTurnRpc);
+  const t = useQuery({ queryKey: ["setup.firstTurn", agentId], queryFn: () => read({ agentId: agentId! }), enabled: !!agentId,
+    // Every 3 s while it starts, for about two minutes; every 10 s after a failure, so a retry that works shows here.
+    refetchInterval: (q) => (q.state.data?.state === "done" ? false : q.state.data?.state === "failed" ? 10_000 : q.state.dataUpdateCount < 40 ? 3_000 : false) });
+  const where = "Open it from the sidebar on the left.";
+  if (t.data?.state === "failed") return <>
+    <Text style={s.bad}>{citizen}'s first message failed: {t.data.message}</Text>
+    <Text style={s.p}>Open {citizen} from the sidebar on the left and send any message to try again.</Text>
+  </>;
+  if (t.data?.state === "done") return <Text style={s.p}>{citizen} has answered in their workspace. {where}</Text>;
+  return <Text style={s.p}>{citizen} is starting in their workspace. {where}</Text>;
 }

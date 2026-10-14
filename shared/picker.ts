@@ -25,6 +25,9 @@ export function view(s: Pick): { citizens: string[]; ultron: UltronState } {
   return { citizens: [...(ultron === "free-off" ? [] : [ORCHESTRATOR]), ...order.sort((a, b) => a.localeCompare(b))], ultron };
 }
 
-// The good-to-go screen offers how the citizens run again only for two or more citizens (Jarvis is not counted): with
-// one, it read as weird (the owner's Mac re-walk, 2026-10-13 16:43 CDT).
-export const modeAfterSetup = (s: Pick): boolean => view(s).citizens.length > 1;
+// The picker as a Start left it, from the citizens it sent (Sean, re-walk 3, 2026-10-14: keep the picks after a failed
+// start). Ultron counts as ticked by hand only when fewer than two packs were picked; with two or more he is locked on.
+export function pickFrom(citizens: readonly string[]): Pick {
+  const packs = (PACKS as readonly string[]).filter((p) => citizens.includes(p));
+  return { packs, ultronByHand: packs.length < 2 && citizens.includes(ORCHESTRATOR) };
+}
