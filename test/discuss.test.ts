@@ -54,3 +54,12 @@ test("an item not on the checklist is refused plainly", async () => {
   const r = await discuss(house(["Ultron"]), "nosuch", fake([]).deps);
   assert.equal(r.ok, false); assert.match(r.message, /not on/);
 });
+
+// Sean, 2026-10-14 10:23 CDT, go on his idea: "let the user simply start with Jarvis if they want a truly single agent
+// setup that can scale up later." In a house of Jarvis alone, Jarvis leads.
+test("in a house of Jarvis alone, Jarvis leads", async () => {
+  const root = house(["Jarvis"]);
+  const f = fake([]);
+  const r = await discuss(root, "lifemap", f.deps);
+  assert.equal(r.citizen, "Jarvis");
+});

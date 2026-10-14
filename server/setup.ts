@@ -47,7 +47,6 @@ const HOUSE_MANAGER = "Jarvis";
 // The whole run, as the tests drive it: connect, then install.
 export async function runSetup(input: SetupInput, deps: Deps): Promise<SetupResult> {
   if (!input.userName?.trim()) return { ok: false, message: "Tell us your name first. Your citizens use it.", steps: [] };
-  if (!input.citizens.length) return { ok: false, message: "Pick at least one citizen to start with.", steps: [] };
   const c = await connect(input, deps);
   if (!c.ok) return c;
   const i = await install(input, deps);
@@ -147,13 +146,15 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   const fail = (message: string): SetupResult => ({ ok: false, message, steps });
   const name = input.userName?.trim();
   if (!name) return fail("Tell us your name first. Your citizens use it.");
-  if (!input.citizens.length) return fail("Pick at least one citizen to start with.");
   const upstream = path.join(input.root, ".upstream");
   // Jarvis comes with every house, beside the picked citizens, on the first one's account; the first desk stays theirs
   // (ticket 004 Q16, ruled 2026-10-12: "At setup, always"). He does not count toward Ultron's two or more: that is the picker's.
   const picked = input.citizens;
   if (!picked.includes(HOUSE_MANAGER) && fs.existsSync(path.join(upstream, "Pockets", HOUSE_MANAGER)))
     input = { ...input, citizens: [...picked, HOUSE_MANAGER], accounts: { [HOUSE_MANAGER]: input.accounts[picked[0]] ?? "claude", ...input.accounts } };
+  // No pick is a house of Jarvis alone, his desk the first (Sean, 2026-10-14: "a truly single agent setup that can scale
+  // up later"); a release without Jarvis still needs a pick.
+  if (!input.citizens.length) return fail("Pick at least one citizen to start with.");
 
   // 4. The house itself: the Commons, the template, and each picked citizen. A pocket already here is the user's, untouched.
   // A newly placed folder gets the user's own name in its {{USER_NAME}} slots (the tenets, Q6); a folder already here is not touched.

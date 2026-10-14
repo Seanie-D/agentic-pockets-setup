@@ -23,7 +23,9 @@ const readJson = (f: string) => { try { return JSON.parse(fs.readFileSync(f, "ut
 // The citizen who leads the tutorial: Ultron when he is in the house, else the first citizen the user picked.
 export function leadOf(root: string): string | null {
   if (fs.existsSync(path.join(root, "Pockets", "Ultron"))) return "Ultron";
-  return ((readJson(path.join(root, "house.json"))?.citizens ?? []) as string[]).find((n) => n !== "Jarvis") ?? null;
+  const citizens = (readJson(path.join(root, "house.json"))?.citizens ?? []) as string[];
+  // A house of Jarvis alone (Sean, 2026-10-14): Jarvis leads.
+  return citizens.find((n) => n !== "Jarvis") ?? (citizens.includes("Jarvis") ? "Jarvis" : null);
 }
 
 export function readTutorial(root: string, probe: Probe = realProbe(root)): Tutorial {

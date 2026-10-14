@@ -27,7 +27,7 @@ export const installToolsRpc = defineRpc({ name: "setup.tools.install", input: z
 export const connectRpc = defineRpc({ name: "setup.connect", input: z.object({ code: z.string().min(8), run: z.string().default("") }), output: Result });
 export const installRpc = defineRpc({
   name: "setup.install",
-  input: z.object({ userName: z.string().min(1), citizens: z.array(z.string()).min(1), accounts: z.record(z.string(), z.string()),
+  input: z.object({ userName: z.string().min(1), citizens: z.array(z.string()), accounts: z.record(z.string(), z.string()),
     extrasOff: z.array(z.string()).default([]), cleanProfile: z.boolean().default(false), mode: z.enum(["on-demand", "always-on"]).default("on-demand"), cafe: z.boolean().default(false),
     run: z.string().default("") }),
   output: Result.extend({ firstDesk: FirstDesk.optional() }),

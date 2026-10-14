@@ -109,6 +109,19 @@ test("the user's own name fills the tenets' slot when the house is placed, and i
   assert.equal(JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8")).userName, "Nick");
 });
 
+// Sean, 2026-10-14 10:23 CDT, go on his idea (walk 3): "let the user simply start with Jarvis if they want a truly single
+// agent setup that can scale up later." No pick is a house of Jarvis alone, and his desk is the first desk.
+test("no pick starts a house of Jarvis alone, with Jarvis's desk the first desk", async () => {
+  const w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: [], accounts: {}, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.deepEqual(r.firstDesk, { citizen: "Jarvis", agentId: "agent-1" });
+  const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.deepEqual(rec.citizens, ["Jarvis"]);
+  assert.equal(rec.desks.Jarvis.provider, "claude", "the house's first account");
+  assert.ok(!fs.existsSync(path.join(w.root, "Pockets", "Ultron")), "no Ultron with no one to coordinate");
+});
+
 test("no name, no run: setup asks for it before anything is placed", async () => {
   const w = world();
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "  ", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);

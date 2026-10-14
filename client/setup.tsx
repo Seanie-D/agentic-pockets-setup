@@ -100,6 +100,8 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const offered = d.packs.filter((p) => (PACKS as readonly string[]).includes(p.name));
   const ultronPack = d.packs.find((p) => p.name === "Ultron");
   const jarvisPack = d.packs.find((p) => p.name === "Jarvis");
+  // No pick starts a house of Jarvis alone (Sean, 2026-10-14), when the release has him.
+  const canStart = v.citizens.length > 0 || !!jarvisPack;
   const accountOf = (n: string) => accounts[n] ?? d.accounts[0] ?? "claude";
   const toolsOk = d.tools.every((t) => t.state === "ok");
   // What this Start made, or, on a rebuilt screen, what the last one made (kept by the server until Finish).
@@ -188,7 +190,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         <TextInput accessibilityLabel="Your name" style={s.input} value={userName} onChangeText={setUserName} autoCorrect={false} placeholder="Your first name" placeholderTextColor={c.foregroundMuted} />
 
         <Text style={s.h2}>4. Who would you like to start with?</Text>
-        <Text style={s.muted}>Tick one to start simple. You can add more at any time.</Text>
+        <Text style={s.muted}>Tick one to start simple, or none to start with Jarvis alone. You can add more at any time.</Text>
         {offered.map((p) => {
           const on = pick.packs.includes(p.name);
           return (
@@ -261,9 +263,9 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         {!d.cafe && <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: cafe }} style={[s.card, cafe && s.picked]} onPress={() => setCafe(!cafe)}>
           <Text style={s.p}>{cafe ? "☑" : "☐"}  {CAFE.offer}</Text>
         </Pressable>}
-        <Pressable accessibilityRole="button" style={[s.button, (!v.citizens.length || !userName.trim() || doInstall.isPending || needsSignIn) && s.locked]} disabled={!v.citizens.length || !userName.trim() || doInstall.isPending || needsSignIn}
+        <Pressable accessibilityRole="button" style={[s.button, (!canStart || !userName.trim() || doInstall.isPending || needsSignIn) && s.locked]} disabled={!canStart || !userName.trim() || doInstall.isPending || needsSignIn}
           onPress={() => doInstall.mutate({ userName: userName.trim(), citizens: v.citizens, accounts: Object.fromEntries(v.citizens.map((n) => [n, accountOf(n)])), extrasOff, cleanProfile, mode, cafe: cafe && !d.cafe })}>
-          <Text style={s.buttonText}>{doInstall.isPending ? "Setting up…" : v.citizens.length ? `Start with ${[...v.citizens, ...(jarvisPack && !v.citizens.includes("Jarvis") ? ["Jarvis"] : [])].map(label).join(", ")}` : "Pick someone to start with"}</Text>
+          <Text style={s.buttonText}>{doInstall.isPending ? "Setting up…" : v.citizens.length ? `Start with ${[...v.citizens, ...(jarvisPack && !v.citizens.includes("Jarvis") ? ["Jarvis"] : [])].map(label).join(", ")}` : jarvisPack ? "Start with Jarvis" : "Pick someone to start with"}</Text>
         </Pressable>
         {doInstall.data && !doInstall.data.ok && <Text style={s.bad}>{doInstall.data.message}</Text>}
         {doInstall.isError && <Text style={s.bad}>Setup stopped: {String(doInstall.error)}. Press the button again to go on.</Text>}
