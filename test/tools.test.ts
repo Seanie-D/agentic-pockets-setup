@@ -17,14 +17,14 @@ const fakeRun = (have: Record<string, string>) => {
 };
 
 test("a machine with everything new enough: all ok", () => {
-  const { run } = fakeRun({ node: "v24.16.0\n", git: "git version 2.43.0\n", claude: "2.1.270 (Claude Code)\n", paseo: "0.11.2\n" });
+  const { run } = fakeRun({ node: "v24.16.0\n", git: "git version 2.43.0\n", claude: "2.1.285 (Claude Code)\n", paseo: "0.11.2\n" });
   assert.deepEqual(checkTools(run).map((t) => [t.name, t.state]), [["node", "ok"], ["git", "ok"], ["claude", "ok"], ["paseo", "ok"]]);
 });
 
 // Friday's Windows walk, 2026-10-12 21:21Z: the app's own command is not on PATH (Program Files\Paseo\resources\bin on
 // Windows, the app bundle on a Mac, /opt/Paseo on Linux), and the check called Paseo "Missing" while this plugin ran in it.
 test("Paseo with no command on PATH is not missing: this plugin runs inside it, and Paseo enforces its 0.11.2 minimum", () => {
-  const { run } = fakeRun({ node: "v24.16.0\n", git: "git version 2.43.0\n", claude: "2.1.270 (Claude Code)\n" });
+  const { run } = fakeRun({ node: "v24.16.0\n", git: "git version 2.43.0\n", claude: "2.1.285 (Claude Code)\n" });
   const p = checkTools(run).find((t) => t.name === "paseo")!;
   assert.equal(p.state, "ok"); assert.equal(p.have, "running");
 });
@@ -98,13 +98,13 @@ test("Mac: a missing tool is installed with Homebrew, Claude Code as its cask", 
 });
 
 test("a tool that is new enough is kept: nothing is installed or upgraded", () => {
-  const m = machine({ have: { node: "24.1.0", git: "2.43.0", claude: "2.1.270", paseo: "0.11.2" }, brew: true });
+  const m = machine({ have: { node: "24.1.0", git: "2.43.0", claude: "2.1.285", paseo: "0.11.2" }, brew: true });
   installTools(m.run, "darwin", () => true);
   assert.deepEqual(m.calls.filter((c) => / (install|upgrade) /.test(c)), []);
 });
 
 test("Mac: an old tool Homebrew manages is upgraded; an old one from elsewhere gets Homebrew's copy", () => {
-  const m = machine({ have: { node: "18.19.0", git: "2.20.1", claude: "2.1.270", paseo: "0.11.2" }, brew: true, managed: ["node"] });
+  const m = machine({ have: { node: "18.19.0", git: "2.20.1", claude: "2.1.285", paseo: "0.11.2" }, brew: true, managed: ["node"] });
   const r = installTools(m.run, "darwin", () => true);
   assert.ok(m.calls.includes("brew upgrade node"));
   assert.ok(m.calls.includes("brew install git"));
@@ -130,7 +130,7 @@ test("Mac without Homebrew: Node and Claude Code from their official installers 
 });
 
 test("Mac without git: Apple's developer tools window opens, and the screen says what to click", () => {
-  const m = machine({ have: { node: "24.16.0", claude: "2.1.270", paseo: "0.11.2" } });
+  const m = machine({ have: { node: "24.16.0", claude: "2.1.285", paseo: "0.11.2" } });
   const r = installTools(m.run, "darwin", () => true);
   assert.ok(m.calls.includes("xcode-select --install"));
   assert.equal(r[1].action, "not done");
@@ -146,7 +146,7 @@ test("Windows: a missing tool is installed with winget for this user only, quiet
 });
 
 test("Windows: when a tool has no installer for one user, winget tries again for the whole computer", () => {
-  const m = machine({ have: { git: "2.45.0", claude: "2.1.270", paseo: "0.11.2" }, winget: true });
+  const m = machine({ have: { git: "2.45.0", claude: "2.1.285", paseo: "0.11.2" }, winget: true });
   const r = installTools(m.run, "win32");
   const node = m.calls.filter((c) => c.startsWith("winget install --id OpenJS.NodeJS.LTS"));
   assert.equal(node.length, 2); assert.ok(!node[1].includes("--scope"));
@@ -154,7 +154,7 @@ test("Windows: when a tool has no installer for one user, winget tries again for
 });
 
 test("Windows: an old tool winget manages is upgraded", () => {
-  const m = machine({ have: { node: "20.11.0", git: "2.45.0", claude: "2.1.270", paseo: "0.11.2" }, winget: true, managed: ["OpenJS.NodeJS.LTS"] });
+  const m = machine({ have: { node: "20.11.0", git: "2.45.0", claude: "2.1.285", paseo: "0.11.2" }, winget: true, managed: ["OpenJS.NodeJS.LTS"] });
   const r = installTools(m.run, "win32");
   assert.ok(m.calls.some((c) => c.startsWith("winget upgrade --id OpenJS.NodeJS.LTS --exact")));
   assert.deepEqual([r[0].action, r[0].have], ["updated", "24.20.0"]);
@@ -241,14 +241,14 @@ test("extras are named as a person would know them: a hook by its script, only r
 });
 
 test("Windows: a per-user install that fails for another reason is not retried for the whole computer, and says why", () => {
-  const m = machine({ have: { git: "2.45.0", claude: "2.1.270", paseo: "0.11.2" }, winget: true, netDown: true });
+  const m = machine({ have: { git: "2.45.0", claude: "2.1.285", paseo: "0.11.2" }, winget: true, netDown: true });
   const r = installTools(m.run, "win32");
   assert.equal(m.calls.filter((c) => c.startsWith("winget install --id OpenJS.NodeJS.LTS")).length, 1, "no admin prompt for a network failure");
   assert.equal(r[0].action, "not done"); assert.match(r[0].message ?? "", /InternetOpenUrl|could not reach|internet/i);
 });
 
 test("Windows: a tool installed for the whole computer says so, so the user knows why Windows asked to allow changes", () => {
-  const m = machine({ have: { git: "2.45.0", claude: "2.1.270", paseo: "0.11.2" }, winget: true });
+  const m = machine({ have: { git: "2.45.0", claude: "2.1.285", paseo: "0.11.2" }, winget: true });
   const r = installTools(m.run, "win32");
   assert.equal(r[0].action, "installed"); assert.match(r[0].message ?? "", /whole computer/);
 });
@@ -256,4 +256,13 @@ test("Windows: a tool installed for the whole computer says so, so the user know
 test("Mac: Homebrew that belongs to another user is left alone, and the route without Homebrew installs for this user", () => {
   const m = machine({ have: { git: "2.39.5", paseo: "0.11.2" }, brew: true });
   noBrewRoute(m, installTools(m.run, "darwin", () => false));
+});
+
+// An invitee on 1.0, 2026-10-14 14:53 CDT: Claude Code 2.1.140 passed the old 2.1.0 floor, and the first desk failed with
+// "API Error: 400 Claude Code 2.1.140 does not support this model; version 2.1.280 or newer is required." The floor is
+// what the release's models need, so setup offers the update before any desk opens.
+test("a Claude Code too old for the release's models is old, so setup offers the update", () => {
+  const { run } = fakeRun({ node: "v24.16.0\n", git: "git version 2.43.0\n", claude: "2.1.140 (Claude Code)\n", paseo: "0.11.2\n" });
+  const c = checkTools(run).find((t) => t.name === "claude")!;
+  assert.equal(c.state, "old"); assert.equal(c.have, "2.1.140"); assert.equal(c.need, "2.1.280");
 });

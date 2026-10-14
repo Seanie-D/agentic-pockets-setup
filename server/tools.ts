@@ -9,7 +9,9 @@ export interface Tool { name: string; state: "ok" | "old" | "missing"; have: str
 const NEED: { name: string; args: string[]; need: string; why: string }[] = [
   { name: "node", args: ["--version"], need: "22.0.0", why: "runs the house's scripts and the memory tool" },
   { name: "git", args: ["--version"], need: "2.30.0", why: "downloads the house and its updates" },
-  { name: "claude", args: ["--version"], need: "2.1.0", why: "Claude Code, the engine most citizens run on" },
+  // The floor is what the release's models need: Claude Code 2.1.140 passed 2.1.0, and an invitee's first desk failed
+  // with "version 2.1.280 or newer is required" (2026-10-14). Raise it when a release names a newer model.
+  { name: "claude", args: ["--version"], need: "2.1.280", why: "Claude Code, the engine most citizens run on" },
   { name: "paseo", args: ["--version"], need: "0.11.2", why: "the app every citizen lives in" },
 ];
 const ver = (s: string) => (s.match(/(\d+)\.(\d+)\.(\d+)/) || [])[0] ?? null;
