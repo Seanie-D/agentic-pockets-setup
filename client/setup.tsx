@@ -148,7 +148,8 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
           {t.state !== "ok" && doTools.data && <Pressable accessibilityRole="link" style={s.quiet} onPress={() => openExternal(HELP[t.name] ?? "https://paseo.sh")}><Text style={s.quietText}>How to get it</Text></Pressable>}
         </View>
       ))}
-      {doTools.data?.tools.filter((t) => t.message).map((t) => <Text key={`m-${t.name}`} style={s.bad}>{t.name}: {t.message}</Text>)}
+      {/* A failed install's message goes once Check again reads that tool ready (Nick's setup, 2026-10-14); a success note stays. */}
+      {doTools.data?.tools.filter((t) => t.message && !(t.action === "not done" && d.tools.find((x) => x.name === t.name)?.state === "ok")).map((t) => <Text key={`m-${t.name}`} style={s.bad}>{t.name}: {t.message}</Text>)}
       {doTools.isError && <Text style={s.bad}>{String(doTools.error)}</Text>}
       {doTools.data?.failed && <Text style={s.bad}>{doTools.data.failed}</Text>}
       {!toolsOk && <View style={s.row}>

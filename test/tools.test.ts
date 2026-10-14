@@ -288,3 +288,26 @@ test("Claude Code still too old after the install: setup names the old copy that
   assert.match(r.message!, /sudo npm uninstall -g @anthropic-ai\/claude-code/);
   assert.match(r.message!, /quit Paseo, open it again, and press Check again/);
 });
+
+// Nick's real case (Sean's photo, 15:55 CDT): the copy that ran first was Anthropic's own install in ~/.local/bin, at
+// 2.1.220; Homebrew's copy came after it. `claude update` fixed it. Setup now runs that copy's own update itself.
+test("Claude Code still too old because Anthropic's own older install runs first: setup updates that copy itself", () => {
+  const LOCAL = "/Users/nickloux/.local/bin/claude", BREW = "/opt/homebrew/bin/claude";
+  const real: Record<string, string> = { [LOCAL]: "/Users/nickloux/.local/share/claude/versions/2.1.220", [BREW]: "/opt/homebrew/Caskroom/claude-code/2.1.300/claude" };
+  const VER: Record<string, string> = { claude: "2.1.220", [LOCAL]: "2.1.220", [BREW]: "2.1.300", node: "24.16.0", git: "2.43.0", paseo: "0.11.2", brew: "4.0.0" };
+  const calls: string[] = [];
+  const run = (cmd: string, args: string[]) => {
+    calls.push([cmd, ...args].join(" "));
+    if (args[0] === "--version" && cmd in VER) return { status: 0, stdout: `${VER[cmd]} (x)\n` };
+    if (cmd === "brew" && args[0] === "--prefix") return { status: 0, stdout: "/opt/homebrew\n" };
+    if (cmd === "brew" && args[0] === "list") return { status: 0, stdout: "claude-code 2.1.300" };
+    if (cmd === "brew") return { status: 0, stdout: "" };
+    if (cmd === "which" && args.join(" ") === "-a claude") return { status: 0, stdout: `${LOCAL}\n${BREW}\n${BREW}\n` };
+    if (cmd === LOCAL && args[0] === "update") { VER[LOCAL] = VER.claude = "2.1.300"; return { status: 0, stdout: "Successfully updated from 2.1.220 to version 2.1.300\n" }; }
+    return { status: 1, stdout: "" };
+  };
+  const r = installTools(run, "darwin", () => true, (p) => real[p] ?? p).find((t) => t.name === "claude")!;
+  assert.ok(calls.includes(`${LOCAL} update`), calls.join("\n"));
+  assert.equal(r.state, "ok"); assert.equal(r.action, "updated"); assert.equal(r.have, "2.1.300");
+  assert.equal(r.message, undefined);
+});

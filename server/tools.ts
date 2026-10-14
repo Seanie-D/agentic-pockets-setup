@@ -85,8 +85,8 @@ function stillOld(copies: Copy[], need: string, platform: NodeJS.Platform): stri
   if (!first || (first.version && !older(first.version, need))) return null;
   const newer = copies.find((c) => c.version && !older(c.version, need));
   const what = [first.version, first.from && `${first.from === "npm" ? "an npm install" : `from ${first.from}`}`].filter(Boolean).join(", ");
-  const how = first.from && REMOVE[first.from] ? ` To remove it, run this in ${platform === "win32" ? "a terminal" : "Terminal"}: ${REMOVE[first.from](platform)}` : " Ask the person who invited you how to remove it.";
-  return `Claude Code is still too old: an older copy at ${first.at}${what ? ` (${what})` : ""} runs first.${newer ? ` The new copy is at ${newer.at} (${newer.version}).` : ""} Remove the old copy, then quit Paseo, open it again, and press Check again.${how}`;
+  const how = first.from === "Anthropic's installer" ? ` It can update itself: run this in ${platform === "win32" ? "a terminal" : "Terminal"}: claude update` : first.from && REMOVE[first.from] ? ` To remove it, run this in ${platform === "win32" ? "a terminal" : "Terminal"}: ${REMOVE[first.from](platform)}` : " Ask the person who invited you how to remove it.";
+  return `Claude Code is still too old: an older copy at ${first.at}${what ? ` (${what})` : ""} runs first.${newer ? ` The new copy is at ${newer.at} (${newer.version}).` : ""} ${first.from === "Anthropic's installer" ? "Update" : "Remove"} the old copy, then quit Paseo, open it again, and press Check again.${how}`;
 }
 
 export function installTools(run: Run, platform: NodeJS.Platform, writable: (dir: string) => boolean = canWrite, resolve: (p: string) => string = fs.realpathSync): Installed[] {
@@ -124,7 +124,13 @@ export function installTools(run: Run, platform: NodeJS.Platform, writable: (dir
         else if (u.status !== 0) why = lastLine(u.stdout);
       }
     } else return { ...before, action: "not done", message: `Install ${t.name} ${t.need} or newer with your system's package manager.` };
-    const after = checkOne(run, t);
+    let after = checkOne(run, t);
+    // Still too old, and the copy that runs first is Anthropic's own install: it updates itself (Nick's Mac, 2026-10-14:
+    // `claude update` was the fix). Setup runs that copy's update, then reads again.
+    if (t.name === "claude" && after.state === "old") {
+      const first = claudeCopies(run, platform, resolve)[0];
+      if (first?.from === "Anthropic's installer" && (!first.version || older(first.version, t.need))) { run(first.at, ["update"]); after = checkOne(run, t); }
+    }
     const action = after.state !== "ok" ? "not done" : before.state === "missing" ? "installed" : "updated";
     const shadowed = t.name === "claude" && after.state === "old" ? stillOld(claudeCopies(run, platform, resolve), t.need, platform) : null;
     if (shadowed) return { ...after, action, message: shadowed };
