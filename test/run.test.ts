@@ -120,6 +120,10 @@ test("no pick starts a house of Jarvis alone, with Jarvis's desk the first desk"
   assert.deepEqual(rec.citizens, ["Jarvis"]);
   assert.equal(rec.desks.Jarvis.provider, "claude", "the house's first account");
   assert.ok(!fs.existsSync(path.join(w.root, "Pockets", "Ultron")), "no Ultron with no one to coordinate");
+  // The review: with no pick the screen sends Jarvis's own account, so his desk is on an account the user has.
+  const o = world();
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: [], accounts: { Jarvis: "claude-work" }, root: o.root, home: o.home }, o.deps);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(o.root, "house.json"), "utf8")).desks.Jarvis.provider, "claude-work");
 });
 
 test("no name, no run: setup asks for it before anything is placed", async () => {

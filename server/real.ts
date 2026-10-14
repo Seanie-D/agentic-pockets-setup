@@ -111,7 +111,8 @@ export function ops(paseo: PaseoApi): Ops {
       for (const [cmd, ...args] of steps) {
         const r = exec(cmd, args, { cwd: dir, timeout: 900_000 });
         if (r.status !== 0) {
-          fs.rmSync(path.join(dir, "node_modules"), { recursive: true, force: true });
+          // On Windows a killed cmd can leave npm holding the folder; the missing built mark still makes the next run build again.
+          try { fs.rmSync(path.join(dir, "node_modules"), { recursive: true, force: true, maxRetries: 5, retryDelay: 500 }); } catch { /* the mark decides */ }
           throw new Error(`could not build it: ${`${r.stderr}\n${r.stdout}`.replace(/\s+/g, " ").trim().slice(-300) || `${cmd} was not found`}`);
         }
       }

@@ -264,7 +264,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
           <Text style={s.p}>{cafe ? "☑" : "☐"}  {CAFE.offer}</Text>
         </Pressable>}
         <Pressable accessibilityRole="button" style={[s.button, (!canStart || !userName.trim() || doInstall.isPending || needsSignIn) && s.locked]} disabled={!canStart || !userName.trim() || doInstall.isPending || needsSignIn}
-          onPress={() => doInstall.mutate({ userName: userName.trim(), citizens: v.citizens, accounts: Object.fromEntries(v.citizens.map((n) => [n, accountOf(n)])), extrasOff, cleanProfile, mode, cafe: cafe && !d.cafe })}>
+          onPress={() => doInstall.mutate({ userName: userName.trim(), citizens: v.citizens, accounts: Object.fromEntries((v.citizens.length ? v.citizens : ["Jarvis"]).map((n) => [n, accountOf(n)])), extrasOff, cleanProfile, mode, cafe: cafe && !d.cafe })}>
           <Text style={s.buttonText}>{doInstall.isPending ? "Setting up…" : v.citizens.length ? `Start with ${[...v.citizens, ...(jarvisPack && !v.citizens.includes("Jarvis") ? ["Jarvis"] : [])].map(label).join(", ")}` : jarvisPack ? "Start with Jarvis" : "Pick someone to start with"}</Text>
         </Pressable>
         {doInstall.data && !doInstall.data.ok && <Text style={s.bad}>{doInstall.data.message}</Text>}
