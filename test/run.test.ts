@@ -129,6 +129,21 @@ test("the house record keeps each citizen's desk row (account, model, workspace,
   });
 });
 
+// Sean, re-walk 3, 2026-10-14 09:30 CDT: "Can we make sure Vision opens in Sonnet 5.5 by default on users' setups?"
+// The release names a citizen's model (RELEASE.json `models`, from release.json); it is kept for a Claude account only.
+test("a citizen the release names a model for gets it in its desk row and its first desk, on a Claude account", async () => {
+  const w = world({ release: { id: "r1", models: { Vision: "claude-sonnet-5-5" } } });
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Vision"], accounts: { Vision: "claude" }, root: w.root, home: w.home }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
+  assert.equal(rec.desks.Vision.model, "claude-sonnet-5-5");
+  assert.equal(rec.desks.Jarvis.model, "claude-opus-5-5", "a citizen the release names no model for keeps the default");
+  assert.ok(w.log.some((l) => l.startsWith("desk Vision — desk claude/claude-sonnet-5-5")), w.log.filter((l) => l.startsWith("desk")).join("\n"));
+  const o = world({ release: { id: "r1", models: { Vision: "claude-sonnet-5-5" } } });
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Vision"], accounts: { Vision: "codex" }, root: o.root, home: o.home }, o.deps);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(o.root, "house.json"), "utf8")).desks.Vision.model, "default", "not a Claude account: the provider default");
+});
+
 test("the extras the user switched off are in every new pocket before its first desk opens, and kept in the house record", async () => {
   const w = world();
   let seenAtOpen: any = null;
