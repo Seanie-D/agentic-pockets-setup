@@ -15,7 +15,7 @@ export function pieceRoot(id: string): { dir: string; skip: string[] } {
   if (id.startsWith("pack:")) return { dir: `Pockets/${id.slice(5)}`, skip: ["core", "memory", ...OWN, LOCAL] };
   if (id.startsWith("memory:")) return { dir: `Pockets/${id.slice(7)}/memory`, skip: [] };
   if (id.startsWith("commons:")) return { dir: `Commons/${id.slice(8)}`, skip: [] };
-  if (id.startsWith("plugin:")) return { dir: `plugins/${id.slice(7)}`, skip: [] };
+  if (id.startsWith("plugin:")) return { dir: `plugins/${id.slice(7)}`, skip: ["node_modules"] };   // built in the house
   if (id.startsWith("house:")) return { dir: id.slice(6), skip: [] };
   throw new Error(`not a piece: ${id}`);
 }

@@ -105,18 +105,11 @@ export function ops(paseo: PaseoApi): Ops {
     },
     // The same commit, fetched and built here with setup's PATH (Homebrew's npm on the Mac), into setup's own folder, then
     // added as a folder plugin, which Paseo does not build. Each failing step's own output is the reason.
-    async buildPlugin(id, source, ref) {
-      const dir = path.join(os.homedir(), ".agentic-pockets", "plugins", id);
-      fs.rmSync(dir, { recursive: true, force: true });
-      fs.mkdirSync(path.dirname(dir), { recursive: true });
-      const run = (what: string, cmd: string, args: string[], cwd?: string) => {
-        const r = exec(cmd, args, { cwd });
-        if (r.status !== 0) throw new Error(`${what}: ${`${r.stderr}\n${r.stdout}`.replace(/\s+/g, " ").trim().slice(-300) || `${cmd} was not found`}`);
-      };
-      run("could not fetch it", "git", ["clone", "--quiet", "--no-checkout", source.replace(/^git:/, ""), dir]);
-      run("could not fetch the reviewed commit", "git", ["-C", dir, "checkout", "--quiet", ref]);
-      run("could not build it", "npm", ["ci", "--include=dev", "--no-audit", "--no-fund"], dir);
-      await addPlugin(id, dir);
+    async buildPlugin(dir, steps) {
+      for (const [cmd, ...args] of steps) {
+        const r = exec(cmd, args, { cwd: dir });
+        if (r.status !== 0) throw new Error(`could not build it: ${`${r.stderr}\n${r.stdout}`.replace(/\s+/g, " ").trim().slice(-300) || `${cmd} was not found`}`);
+      }
     },
     // Claude where setup finds it but Paseo, on its own PATH, does not (~/.local/bin on the Mac): Paseo gets the full path.
     async pinClaude() {

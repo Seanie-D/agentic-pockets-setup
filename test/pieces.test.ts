@@ -25,3 +25,14 @@ test("the pinned hashes, shared with the release build", () => {
   for (const [id, h] of Object.entries(pins)) assert.equal(pieceHash(r, id), h, id);
   assert.equal(pieceHash(r, "pack:Nobody"), null);
 });
+
+// Beautiful Pockets (2026-10-14) is built in the house: its node_modules is no part of the piece, as in pieces.mjs.
+test("a plugin's node_modules, built in the house, is no part of its piece's hash", () => {
+  const r = fs.mkdtempSync(path.join(os.tmpdir(), "pin-"));
+  fs.mkdirSync(path.join(r, "plugins", "chat"), { recursive: true });
+  fs.writeFileSync(path.join(r, "plugins", "chat", "index.ts"), "x\n");
+  const before = pieceHash(r, "plugin:chat");
+  fs.mkdirSync(path.join(r, "plugins", "chat", "node_modules", "y"), { recursive: true });
+  fs.writeFileSync(path.join(r, "plugins", "chat", "node_modules", "y", "i.js"), "built\n");
+  assert.equal(pieceHash(r, "plugin:chat"), before);
+});

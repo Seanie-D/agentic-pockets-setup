@@ -14,10 +14,11 @@ function upstream() {
   const w = (f: string, body = "x") => { fs.mkdirSync(path.dirname(path.join(u, f)), { recursive: true }); fs.writeFileSync(path.join(u, f), body); };
   w("Commons/tenets.md", "11. **Scripts flag, {{USER_NAME}} decides.**\n"); w("Commons/skills/x/SKILL.md", "Fill {{SKIPS}} here; {{USER_NAME}} owns it.\n"); w("Pockets/_Template/core/VERSION", "0.1.22");
   w("plugins/agentic-pockets/paseo-plugin.json", '{ "id": "agentic-pockets" }');
+  w("plugins/beautiful-pockets/paseo-plugin.json", '{ "id": "beautiful-pockets", "build": [["npm", "ci", "--include=dev"]] }');
   for (const n of ["Ultron", "Jarvis", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
   return u;
 }
-function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; chatFailsOnce?: boolean; installed?: string[]; pin?: () => Promise<string | null>; pinNode?: (ids: string[]) => Promise<string | null>; deskOf?: (cwd: string) => Promise<string | null>; release?: object } = {}) {
+function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[]; pin?: () => Promise<string | null>; pinNode?: (ids: string[]) => Promise<string | null>; deskOf?: (cwd: string) => Promise<string | null>; release?: object } = {}) {
   const up = upstream();
   if (opts.release) fs.writeFileSync(path.join(up, "RELEASE.json"), JSON.stringify(opts.release));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-")); const root = path.join(home, "agentic-pockets");
@@ -44,8 +45,8 @@ function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean;
       pinClaude: opts.pin ?? (async () => null),
       pinNode: opts.pinNode ?? (async () => null),
       deskOf: opts.deskOf ?? (async () => null),
-      installGitPlugin: async (source, ref) => { log.push(`gitplugin ${source}${ref ? ` @${ref}` : ""}`); if (!source.includes("paseo-cafe") && opts.chatFailsOnce && !log.some((l) => l === "chat failed once")) { log.push("chat failed once"); throw new Error("clone timed out"); } if (source.includes("paseo-cafe") ? opts.cafeFails : opts.chatFails) throw new Error("no paseo command"); },
-      buildPlugin: async (id, source, ref) => { log.push(`builtplugin ${id} ${source} @${ref}`); if (opts.chatFails) throw new Error("no npm here either"); },
+      installGitPlugin: async (source, ref) => { log.push(`gitplugin ${source}${ref ? ` @${ref}` : ""}`); if (source.includes("paseo-cafe") ? opts.cafeFails : opts.chatFails) throw new Error("no paseo command"); },
+      buildPlugin: async (dir, steps) => { log.push(`built ${path.basename(dir)} ${steps.map((x) => x.join(" ")).join(" && ")}`); if (opts.chatFails) throw new Error("could not build it: npm was not found"); },
       hasPlugin: async (id) => (opts.installed ?? []).includes(id),
       welcome: async (agentId, citizen) => { log.push(`welcome ${agentId} ${citizen}`); },
       openDesk: async (o) => { log.push(`desk ${o.title} ${o.provider}/${o.model} ${JSON.stringify(o.labels)} cwd=${o.cwd}`); return { agentId: "agent-1" }; },
@@ -359,31 +360,46 @@ test("a citizen not in this release stops the run before any pocket is placed", 
   assert.ok(!fs.existsSync(path.join(w.root, "Pockets", "Verro")), "nothing placed");
 });
 
-// Beautiful Chat in every house (ticket 022; Sean, 2026-10-13 09:52 CDT: "integrating Beautiful Chat as part of its install").
-// Always installed, from its Git source pinned to the commit we reviewed, so neither the official directory nor the
-// Cafe's auto-update can move it before Friday walks the move.
-test("Beautiful Chat: always added, from its Git source, pinned to the reviewed commit", async () => {
+// Beautiful Pockets in every house: our own copy of Beautiful Chat with tool cards closed (Sean, 2026-10-14 09:35 CDT,
+// option A 10:03 CDT). It ships in the release beside the house plugin, as a folder, so neither the official directory
+// nor the Cafe can move it; setup builds it with its own PATH (Paseo builds no folder plugin, and on a Mac opened from
+// the Dock its PATH has no npm).
+test("Beautiful Pockets: placed from the release, built in its folder with its own build step, and added", async () => {
   const w = world();
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
   assert.equal(r.ok, true, r.message);
-  assert.ok(w.log.includes("gitplugin git:https://github.com/ABorakati/beautiful-chat.git @42b61d8301b5400a67821bbbfcf99fa8b681dc37"), w.log.join("\n"));
-  assert.ok(r.steps.includes("Added Beautiful Chat to Paseo: a cleaner look for every chat."));
+  const dir = path.join(w.root, "plugins", "beautiful-pockets");
+  assert.ok(fs.existsSync(path.join(dir, "paseo-plugin.json")));
+  const i = w.log.indexOf("built beautiful-pockets npm ci --include=dev");
+  assert.ok(i >= 0 && w.log.indexOf(`plugin beautiful-pockets ${dir}`) > i, w.log.join("\n"));
+  assert.ok(r.steps.includes("Added Beautiful Pockets to Paseo: a cleaner look for every chat, with tool cards closed until you open them."), r.steps.join("\n"));
+  assert.ok(!w.log.some((l) => l.includes("beautiful-chat")), "Beautiful Chat itself is no longer installed");
+  assert.ok(!w.log.some((l) => l.startsWith("built agentic-pockets")), "a plugin with no build step is not built");
 });
 
-test("Beautiful Chat: a copy already in Paseo is kept, not installed again", async () => {
+test("Beautiful Pockets: with Beautiful Chat already in Paseo, setup keeps the user's and adds no second chat look", async () => {
   const w = world({ installed: ["beautiful-chat"] });
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
-  assert.ok(!w.log.some((l) => l.includes("beautiful-chat.git")));
-  assert.ok(r.steps.includes("Beautiful Chat is already in Paseo; setup kept yours."));
+  assert.ok(!w.log.some((l) => l.includes("beautiful-pockets")), w.log.join("\n"));
+  assert.ok(r.steps.includes("Beautiful Chat is already in Paseo; setup kept yours and added no second chat look."), r.steps.join("\n"));
 });
 
-test("Beautiful Chat: when it cannot be added, setup goes on and says where to add it by hand", async () => {
+test("Beautiful Pockets: when it cannot be built, setup goes on, names why, and the house plugin is still added", async () => {
   const w = world({ chatFails: true });
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
   assert.equal(r.ok, true);
-  assert.ok(r.steps.some((x) => x.startsWith("Setup could not add Beautiful Chat") && x.includes("Settings, Plugins") && x.includes("git:https://github.com/ABorakati/beautiful-chat.git")), r.steps.join("\n"));
-  // Both tries' reasons reach the step: Paseo's own, then setup's build (the review, 2026-10-13).
-  assert.ok(r.steps.some((x) => x.includes("no paseo command") && x.includes("no npm here either")), r.steps.join("\n"));
+  assert.ok(r.steps.includes("Setup could not add Beautiful Pockets (could not build it: npm was not found). Your house works without it; Jarvis can add it later."), r.steps.join("\n"));
+  assert.ok(!w.log.some((l) => l.startsWith("plugin beautiful-pockets")), "not added half-built");
+  assert.ok(w.log.some((l) => l.startsWith("plugin agentic-pockets")));
+});
+
+test("Beautiful Pockets: a folder already built is not built again", async () => {
+  const w = world();
+  fs.mkdirSync(path.join(w.root, "plugins", "beautiful-pockets", "node_modules"), { recursive: true });
+  fs.writeFileSync(path.join(w.root, "plugins", "beautiful-pockets", "paseo-plugin.json"), '{ "id": "beautiful-pockets", "build": [["npm", "ci"]] }');
+  await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
+  assert.ok(!w.log.some((l) => l.startsWith("built beautiful-pockets")), w.log.join("\n"));
+  assert.ok(w.log.some((l) => l.startsWith("plugin beautiful-pockets")));
 });
 
 test("a citizen's Paseo workspace is titled with its display name: Miss Minutes, not MissMinutes", async () => {
@@ -428,19 +444,6 @@ test("a run after a desk is already open opens no second desk", async () => {
   assert.ok(r.steps.includes("Ultron's desk was already open."), r.steps.join("\n"));
 });
 
-// The owner's 15:51 walk, 2026-10-13: the Mac never got Beautiful Chat. A failed install is tried once more.
-// The Mac re-walk, 2026-10-13 16:43 CDT: Paseo builds a Git plugin with its own PATH, which on the Mac lacks npm, so a
-// second Git try fails the same way. The second try is setup's own: fetch the same commit, build it with setup's PATH,
-// and add the folder (Paseo builds no folder plugin).
-test("a Beautiful Chat Git install that fails is tried again as a folder setup builds itself, at the same commit, and lands", async () => {
-  const w = world({ chatFailsOnce: true });
-  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home }, w.deps);
-  assert.ok(r.steps.includes("Added Beautiful Chat to Paseo: a cleaner look for every chat."), r.steps.join("\n"));
-  assert.deepEqual(w.log.filter((l) => l.includes("beautiful-chat")), [
-    "gitplugin git:https://github.com/ABorakati/beautiful-chat.git @42b61d8301b5400a67821bbbfcf99fa8b681dc37",
-    "builtplugin beautiful-chat git:https://github.com/ABorakati/beautiful-chat.git @42b61d8301b5400a67821bbbfcf99fa8b681dc37"]);
-});
-
 // The update system, ticket 06: setup changes only through the house's offer, so the Cafe never updates it.
 test("with the Cafe added, or already in Paseo, setup is on the Cafe's opt-out list", async () => {
   for (const o of [{ cafe: true, installed: [] as string[] }, { cafe: false, installed: ["paseo-cafe"] }]) {
@@ -448,7 +451,7 @@ test("with the Cafe added, or already in Paseo, setup is on the Cafe's opt-out l
     const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts, root: w.root, home: w.home, cafe: o.cafe }, w.deps);
     assert.equal(r.ok, true, r.message);
     const f = path.join(w.home, ".paseo", "plugin-settings", "paseo-cafe", "directory-settings.json");
-    assert.deepEqual(JSON.parse(fs.readFileSync(f, "utf8")).values.autoUpdateOptOuts, ["agentic-pockets-setup", "beautiful-chat"], "Paseo keeps no pin, so the opt-out is what holds both");
+    assert.deepEqual(JSON.parse(fs.readFileSync(f, "utf8")).values.autoUpdateOptOuts, ["agentic-pockets-setup"], "Paseo keeps no pin, so the opt-out is what holds setup; Beautiful Pockets is a folder the Cafe never updates");
   }
   const bad = world({ installed: ["paseo-cafe"] });
   const bf = path.join(bad.home, ".paseo", "plugin-settings", "paseo-cafe", "directory-settings.json");

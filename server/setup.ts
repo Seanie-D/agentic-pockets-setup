@@ -9,7 +9,7 @@ import { season } from "./seasonings.ts";
 import { applyExtrasOff, type Extra } from "./tools.ts";
 import { DEFAULT_MODE, tierFor, withTier, type Mode } from "../shared/mode.ts";
 import { CAFE, withOptOut } from "../shared/cafe.ts";
-import { BEAUTIFUL_CHAT } from "../shared/beautiful-chat.ts";
+import { BEAUTIFUL_CHAT, BEAUTIFUL_POCKETS } from "../shared/beautiful-pockets.ts";
 import { pieceHash } from "./pieces.ts";
 
 const SETUP_ID = "agentic-pockets-setup";   // this plugin's own Paseo id (paseo-plugin.json)
@@ -24,8 +24,8 @@ export interface Ops {
   // Each named Claude provider gets Node's folder at the front of its PATH, when Paseo's own PATH lacks it: the folder, or null.
   pinNode(ids: string[]): Promise<string | null>;
   installGitPlugin(source: string, ref?: string): Promise<void>;
-  // A Git plugin fetched and built by setup itself, with setup's PATH, then added as a folder (Paseo builds no folder plugin).
-  buildPlugin(id: string, source: string, ref: string): Promise<void>;
+  // A plugin folder's own build steps (paseo-plugin.json "build"), run in it with setup's PATH: Paseo builds no folder plugin.
+  buildPlugin(dir: string, steps: string[][]): Promise<void>;
   // The open desk of the pocket at cwd (a record labelled role=desk, not archived), or null.
   deskOf(cwd: string): Promise<string | null>;
   hasPlugin(id: string): Promise<boolean>;
@@ -184,46 +184,38 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   // Ticket 004 Q2: the house plugin travels with setup. It holds the house's machinery (the Mailman, the nightly clock-out,
   // the save point) and its views, so it is placed in the house and added to Paseo before any desk opens. A folder already
   // here is kept; Paseo is told again, which changes nothing when it already has it.
+  // Beautiful Pockets travels the same way, and is built here first: its own build step, run with setup's PATH (Paseo
+  // builds no folder plugin). A user who has Beautiful Chat keeps it, and gets no second chat look beside it.
   let plugins: string[] = []; try { plugins = fs.readdirSync(path.join(upstream, "plugins")); } catch { /* a release without plugins */ }
   for (const id of plugins) {
+    const chat = id === BEAUTIFUL_POCKETS;
+    if (chat && await deps.ops.hasPlugin(BEAUTIFUL_CHAT).catch(() => false)) { steps.push("Beautiful Chat is already in Paseo; setup kept yours and added no second chat look."); continue; }
     const to = path.join(input.root, "plugins", id);
     if (!fs.existsSync(to)) fs.cpSync(path.join(upstream, "plugins", id), to, { recursive: true, verbatimSymlinks: true });
-    try {
-      const { running } = await deps.ops.addPlugin(id, to);
-      steps.push(running ? "Added the house plugin to Paseo." : "Added the house plugin to Paseo. It starts the next time Paseo starts: quit Paseo and open it again.");
-    }
-    catch (e) { steps.push(`Setup could not add the house plugin to Paseo (${String((e as Error)?.message ?? e).slice(0, 160)}). Your citizens work without it, but nothing wakes them on mail or closes them at night until it is added.`); }
-  }
-
-  // Beautiful Chat, in every house (ticket 022). A copy the user already has is theirs to keep.
-  if (await deps.ops.hasPlugin(BEAUTIFUL_CHAT.id).catch(() => false)) steps.push("Beautiful Chat is already in Paseo; setup kept yours.");
-  else {
-    // Twice, and a failure's reason in setup's own plugin log too (the owner's 15:51 walk: the Mac never got it, and the
-    // reason was on the screen only). Paseo builds a Git plugin with its own PATH, which on a Mac opened from the Dock has
-    // no npm (the 16:43 re-walk), so the second try is setup's own build of the same commit.
     const why = (e: unknown) => String((e as Error)?.message ?? e);
-    const install = async () => {
-      try { await deps.ops.installGitPlugin(BEAUTIFUL_CHAT.source, BEAUTIFUL_CHAT.ref); return; }
-      catch (e) {
-        const first = why(e);
-        console.error(`setup: Beautiful Chat install failed, building it here instead: ${first.slice(0, 300)}`);
-        try { await deps.ops.buildPlugin(BEAUTIFUL_CHAT.id, BEAUTIFUL_CHAT.source, BEAUTIFUL_CHAT.ref); }
-        catch (e2) { throw new Error(`${first.slice(0, 160)}; then setup's own try: ${why(e2).slice(0, 160)}`); }
-      }
-    };
-    try { await install(); steps.push("Added Beautiful Chat to Paseo: a cleaner look for every chat."); }
-    catch (e) { console.error(`setup: Beautiful Chat install failed twice: ${why(e).slice(0, 300)}`); steps.push(`Setup could not add Beautiful Chat (${why(e).slice(0, 340)}). Your house works without it. You can add it in Paseo: Settings, Plugins, Plugin source: ${BEAUTIFUL_CHAT.source}`); }
+    try {
+      let build: string[][] = []; try { build = JSON.parse(fs.readFileSync(path.join(to, "paseo-plugin.json"), "utf8")).build ?? []; } catch { /* no manifest: nothing to build */ }
+      if (build.length && !fs.existsSync(path.join(to, "node_modules"))) await deps.ops.buildPlugin(to, build);
+      const { running } = await deps.ops.addPlugin(id, to);
+      const added = chat ? "Added Beautiful Pockets to Paseo: a cleaner look for every chat, with tool cards closed until you open them." : "Added the house plugin to Paseo.";
+      steps.push(running ? added : `${added} It starts the next time Paseo starts: quit Paseo and open it again.`);
+    }
+    catch (e) {
+      if (chat) { console.error(`setup: Beautiful Pockets was not added: ${why(e).slice(0, 300)}`); steps.push(`Setup could not add Beautiful Pockets (${why(e).slice(0, 200)}). Your house works without it; Jarvis can add it later.`); }
+      else steps.push(`Setup could not add the house plugin to Paseo (${why(e).slice(0, 160)}). Your citizens work without it, but nothing wakes them on mail or closes them at night until it is added.`);
+    }
   }
 
-  // The Paseo Cafe, only when the user ticked it; the house works without it. With the Cafe in Paseo, setup and Beautiful
-  // Chat go on its opt-out list first, before the Cafe's first update run: Paseo keeps no commit pin (proved 2026-10-13),
-  // so the opt-out is what holds them; they change only through the house's offer (update system, ticket 06).
+  // The Paseo Cafe, only when the user ticked it; the house works without it. With the Cafe in Paseo, setup goes on its
+  // opt-out list first, before the Cafe's first update run: Paseo keeps no commit pin (proved 2026-10-13), so the opt-out
+  // is what holds it; it changes only through the house's offer (update system, ticket 06). Beautiful Pockets is a
+  // folder, which the Cafe never updates.
   if (input.cafe || await deps.ops.hasPlugin(CAFE.id).catch(() => false)) {
     const f = path.join(input.paseoHome || path.join(input.home, ".paseo"), "plugin-settings", CAFE.id, "directory-settings.json");
     try {
       // Only a missing file means "none yet": a file setup cannot read is the user's, and is never written over.
       const cur = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : null;
-      fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(withOptOut(withOptOut(cur, SETUP_ID), BEAUTIFUL_CHAT.id)));
+      fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(withOptOut(cur, SETUP_ID)));
     } catch (e) { steps.push(`Setup could not keep the Paseo Cafe from updating it (${String((e as Error)?.message ?? e).slice(0, 120)}).`); }
   }
   if (input.cafe) {

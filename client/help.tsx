@@ -7,7 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { helpAskRpc, helpGlossaryRpc } from "../shared/contracts";
-import { PICTURE_TIP } from "../shared/beautiful-chat";
+import { PICTURE_TIP } from "../shared/beautiful-pockets";
 
 type S = Record<"h2" | "p" | "muted" | "good" | "quiet" | "quietText", object>;
 type Asked = { ok: boolean; agentId?: string; citizen?: string; message: string };
