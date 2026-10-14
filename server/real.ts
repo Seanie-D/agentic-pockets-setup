@@ -43,7 +43,7 @@ export const exec: Exec = (cmd, args, o) => {
   delete env.PASEO_AGENT_ID; delete env.PASEO_AGENT_CWD;
   // On Windows cmd runs it, so a .cmd shim (paseo, claude, npm) is found; the line is built here, each argument quoted where it needs it.
   const win = process.platform === "win32";
-  const r = spawnSync(win ? cmdLine(cmd, args) : cmd, win ? [] : args, { env, cwd: o?.cwd, encoding: "utf8", timeout: 300_000, shell: win });
+  const r = spawnSync(win ? cmdLine(cmd, args) : cmd, win ? [] : args, { env, cwd: o?.cwd, encoding: "utf8", timeout: o?.timeout ?? 300_000, shell: win });
   return { status: r.error ? 127 : r.status, stdout: r.stdout ?? "", stderr: (r.stderr ?? "") + (r.error ? String(r.error.message) : "") };
 };
 

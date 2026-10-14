@@ -13,7 +13,7 @@ import { BEAUTIFUL_CHAT } from "../shared/beautiful-chat.ts";
 import { pieceHash } from "./pieces.ts";
 
 const SETUP_ID = "agentic-pockets-setup";   // this plugin's own Paseo id (paseo-plugin.json)
-export interface Exec { (cmd: string, args: string[], o?: { env?: Record<string, string>; cwd?: string }): { status: number | null; stdout: string; stderr: string } }
+export interface Exec { (cmd: string, args: string[], o?: { env?: Record<string, string>; cwd?: string; timeout?: number }): { status: number | null; stdout: string; stderr: string } }
 export interface Ops {
   createWorkspace(o: { dir: string; title: string }): Promise<{ workspaceId: string; projectId: string | null }>;
   setIcon(projectId: string, pngPath: string): Promise<void>;
