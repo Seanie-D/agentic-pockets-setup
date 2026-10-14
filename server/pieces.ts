@@ -1,12 +1,12 @@
 // A release piece's hash, in a house (the update system, ticket 01): the same hashing as the release build
 // (Commons/skills/records/house-update/pieces.mjs, where the pieces are named). Both tests pin one fixture and
-// the same hashes. A pocket's session logs, tasks and inbox, and Claude Code's per-house .claude/settings.local.json,
+// the same hashes. A pocket's session logs, tasks, inbox and tutorial ticks, and Claude Code's per-house .claude/settings.local.json,
 // are the house's own and in no piece; a pack's shipped memory is its own piece, memory:<Name>.
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 
-const OWN = ["session-logs", "tasks", "inbox"];
+const OWN = ["session-logs", "tasks", "inbox", "tutorial"];
 const LOCAL = ".claude/settings.local.json";
 
 export function pieceRoot(id: string): { dir: string; skip: string[] } {

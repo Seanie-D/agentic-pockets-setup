@@ -36,3 +36,16 @@ test("a plugin's node_modules, built in the house, is no part of its piece's has
   fs.writeFileSync(path.join(r, "plugins", "chat", "node_modules", "y", "i.js"), "built\n");
   assert.equal(pieceHash(r, "plugin:chat"), before);
 });
+
+// Friday's two-release check, 2026-10-14: TH5's Ultron ticked a tutorial page (tutorial/ticks.json), and the next
+// release offered his pack as `both`. A citizen's tutorial record is its own, like its tasks, as in pieces.mjs.
+test("a citizen's tutorial record is no part of its pack's hash", () => {
+  const r = fs.mkdtempSync(path.join(os.tmpdir(), "pin-"));
+  fs.mkdirSync(path.join(r, "Pockets", "Ultron"), { recursive: true });
+  fs.writeFileSync(path.join(r, "Pockets", "Ultron", "AGENTS.md"), "# U\n");
+  const before = pieceHash(r, "pack:Ultron");
+  fs.mkdirSync(path.join(r, "Pockets", "Ultron", "tutorial"), { recursive: true });
+  fs.writeFileSync(path.join(r, "Pockets", "Ultron", "tutorial", "ticks.json"), "{}\n");
+  assert.equal(pieceHash(r, "pack:Ultron"), before);
+  fs.rmSync(r, { recursive: true, force: true });
+});
