@@ -7,11 +7,11 @@ import { useRpc } from "@getpaseo/plugin/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, Text, View } from "react-native";
-import { tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc } from "../shared/contracts";
+import { tutorialDiscussRpc, tutorialGotItRpc, tutorialReadRpc, tutorialSeenRpc } from "../shared/contracts";
 import { DrawingView } from "./drawing";
 import { Help, useAsk } from "./help";
 
-type S = Record<"h1" | "h2" | "p" | "muted" | "good" | "quiet" | "quietText", object>;
+type S = Record<"h1" | "h2" | "p" | "muted" | "good" | "quiet" | "quietText" | "button" | "buttonText", object>;
 type Bubble = { from: "you" | "citizen"; text: string };
 const NAMES: Record<string, string> = { MissMinutes: "Miss Minutes" };
 const STEP_MS = 900;   // the mock-up's pace: one bubble each 0.9 s
@@ -48,6 +48,9 @@ export function TutorialView({ s, theme, compact, navigation }: { s: S; theme: P
   const discuss = useMutation({ mutationFn: discussRpc, onSuccess: (r: Discussed) => { if (r.ok && r.agentId) navigation?.openAgent({ agentId: r.agentId }); } });
   const help = useAsk(navigation);   // after 100 %, "Ask <lead> about this" asks without a tick (client/help.tsx)
   const markSeen = useRpc(tutorialSeenRpc);
+  // "Got it" (the owner, 2026-10-14): the user ticks a page they have read; the list reads again at once.
+  const gotItRpc = useRpc(tutorialGotItRpc);
+  const gotIt = useMutation({ mutationFn: gotItRpc, onSuccess: () => { void q.refetch(); } });
   const [cur, setCur] = useState<string | null>(null);
   // Whether each page was new when this screen first showed it: the server's list, as it was before this visit.
   const [fresh, setFresh] = useState<Record<string, boolean>>({});
@@ -70,7 +73,7 @@ export function TutorialView({ s, theme, compact, navigation }: { s: S; theme: P
       <Text style={s.h1}>{t.complete ? "Agentic Pockets Help" : `Tutorial · ${t.percent} %`}</Text>
       <Text style={s.muted}>{t.complete
         ? "Everything is explained. Re-read any page, or ask about it again."
-        : `${done} of ${items.length} explained. Ask any citizen about an item; it is ticked when they explain it.`}</Text>
+        : `${done} of ${items.length} done. Press Got it when a page makes sense to you, or ask any citizen about it: it is ticked when they explain it.`}</Text>
       {/* Ultron's prototype (variant A, the owner's pick): a progress bar under the heading. */}
       {!t.complete && <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: t.percent }} style={{ height: 10, borderRadius: 99, backgroundColor: c.surface2, overflow: "hidden" }}>
         <View style={{ width: `${t.percent}%`, height: "100%", backgroundColor: c.statusSuccess }} />
@@ -96,7 +99,8 @@ export function TutorialView({ s, theme, compact, navigation }: { s: S; theme: P
           {page.lines?.map((l, k) => <Text key={k} style={s.p}>•  {l.text}</Text>)}
           {/* Drawn once fresh is known: drawn before, its bubbles start shown and the fade-in has nothing to show (the walk). */}
           {page.example && page.id in fresh && <Example key={page.id} example={page.example} animate={fresh[page.id] === true} theme={theme} />}
-          {page.done && <Text style={s.good}>✓ Explained by {NAMES[page.done.by] ?? page.done.by}</Text>}
+          {page.done && <Text style={s.good}>{page.done.by === "you" ? "✓ Got it" : `✓ Explained by ${NAMES[page.done.by] ?? page.done.by}`}</Text>}
+          {!page.done && <Pressable accessibilityRole="button" style={s.button} disabled={gotIt.isPending} onPress={() => gotIt.mutate({ id: page.id })}><Text style={s.buttonText}>Got it</Text></Pressable>}
           {lead && <Pressable accessibilityRole="button" style={[s.quiet, { alignSelf: "flex-start" }]} disabled={discuss.isPending || help.isPending} onPress={() => t.complete ? help.mutate({ kind: "page", id: page.id }) : discuss.mutate({ itemId: page.id })}><Text style={s.quietText}>{ask}</Text></Pressable>}
           {discuss.data && !t.complete && <Text style={discuss.data.ok ? s.good : s.muted}>{discuss.data.message}</Text>}
           {help.data && t.complete && <Text style={help.data.ok ? s.good : s.muted}>{help.data.message}</Text>}

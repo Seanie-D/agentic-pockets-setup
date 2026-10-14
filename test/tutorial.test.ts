@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { readTutorial, stateTicks, markSeen, LABEL_DURING, LABEL_AFTER } from "../server/tutorial.ts";
+import { readTutorial, stateTicks, markSeen, gotIt, LABEL_DURING, LABEL_AFTER } from "../server/tutorial.ts";
 
 function house(o: { jhs?: boolean } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "house-"));
@@ -116,4 +116,29 @@ test("a page opened once is remembered, so its example plays one bubble at a tim
   assert.deepEqual(readTutorial(h.root, probe()).seen, []);
   markSeen(h.root, "close"); markSeen(h.root, "close"); markSeen(h.root, "scripts");
   assert.deepEqual(readTutorial(h.root, probe()).seen, ["close", "scripts"]);
+});
+
+// The owner, 2026-10-14 13:19 CDT (Friday's session): "Just needs a 'got it' button". His 2026-10-08 requirement on ticket
+// 009: an item is checked off when explained in chat "or read in the plugin's own description of it". The user's own
+// tick lives in house.json beside the setup ticks; no citizen's pocket is written.
+test("Got it: the user ticks a page they have read, it counts, and it is the user's own", () => {
+  const h = house();
+  assert.equal(readTutorial(h.root).percent, 0);
+  gotIt(h.root, "lifemap", "2026-10-14T18:30:00Z");
+  gotIt(h.root, "lifemap", "2026-10-14T18:40:00Z");   // a second press keeps the first
+  gotIt(h.root, "nosuch", "2026-10-14T18:30:00Z");    // not an item of this house: nothing written
+  const t = readTutorial(h.root);
+  assert.deepEqual(t.items.find((i) => i.id === "lifemap")!.done, { at: "2026-10-14T18:30:00Z", by: "you" });
+  assert.equal(t.percent, 33);
+  const rec = JSON.parse(fs.readFileSync(path.join(h.root, "house.json"), "utf8"));
+  assert.deepEqual(rec.tutorialGotIt, { lifemap: "2026-10-14T18:30:00Z" });
+  assert.deepEqual(rec.citizens, ["Ultron", "Verro"], "the rest of the record is kept");
+  assert.ok(!fs.existsSync(path.join(h.root, "Pockets", "Ultron", "tutorial")), "no citizen's pocket is written");
+});
+
+test("Got it and a citizen's explanation: the first one counts", () => {
+  const h = house();
+  h.w("Pockets/Verro/tutorial/ticks.json", JSON.stringify({ desk: "2026-10-14T09:00:00Z" }));
+  gotIt(h.root, "desk", "2026-10-14T18:30:00Z");
+  assert.deepEqual(readTutorial(h.root).items.find((i) => i.id === "desk")!.done, { at: "2026-10-14T09:00:00Z", by: "Verro" });
 });

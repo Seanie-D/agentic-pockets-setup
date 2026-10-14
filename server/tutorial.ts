@@ -51,6 +51,9 @@ export function readTutorial(root: string, probe: Probe = realProbe(root)): Tuto
   // The setup items, ticked from the real state when the tutorial opened (stateTicks), kept in the house record.
   const setup = readJson(path.join(root, "house.json"))?.tutorialTicks ?? {};
   for (const i of items) { const at = setup[i.id]; if (typeof at === "string" && (!i.done || at < i.done.at)) i.done = { at, by: "setup" }; }
+  // The user's own "Got it" (gotIt, below), in the house record: by "you".
+  const mine = readJson(path.join(root, "house.json"))?.tutorialGotIt ?? {};
+  for (const i of items) { const at = mine[i.id]; if (typeof at === "string" && (!i.done || at < i.done.at)) i.done = { at, by: "you" }; }
   // The machinery's Jev ticks at close (house plugin, ticket 009 Q2 with Jev): its own file, never a citizen's pocket.
   const jev = readJson(path.join(root, ".machinery", "jev-ticks.json")) ?? {};
   for (const i of items) {
@@ -79,6 +82,18 @@ export function stateTicks(root: string, probe: Probe, now: string): void {
   let changed = false;
   for (const i of list) if (i.tickedBy && !ticks[i.id] && probe.state(i.tickedBy)) { ticks[i.id] = now; changed = true; }
   if (changed) fs.writeFileSync(file, JSON.stringify({ ...rec, tutorialTicks: ticks }, null, 2) + "\n");
+}
+
+// "Got it" (the owner, 2026-10-14 13:19 CDT; ticket 009, his 2026-10-08 word: an item is checked off when explained in
+// chat "or read in the plugin's own description of it"). The user's tick goes into house.json (`tutorialGotIt`), beside
+// the setup ticks, never into a citizen's pocket. Only an item of this house's tutorial; a second press keeps the first.
+export function gotIt(root: string, id: string, now: string): void {
+  const file = path.join(root, "house.json");
+  const rec = readJson(file); if (!rec) return;
+  if (!readTutorial(root).items.some((i) => i.id === id)) return;
+  const mine: Record<string, string> = { ...(rec.tutorialGotIt ?? {}) };
+  if (mine[id]) return;
+  fs.writeFileSync(file, JSON.stringify({ ...rec, tutorialGotIt: { ...mine, [id]: now } }, null, 2) + "\n");
 }
 
 // The pages the user has opened, in house.json (`tutorialSeen`), so an example plays bubble by bubble only once.

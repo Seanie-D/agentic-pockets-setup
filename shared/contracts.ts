@@ -46,6 +46,8 @@ export const tutorialReadRpc = defineRpc({ name: "setup.tutorial.read", input: z
   reward: z.object({ citizen: z.string(), drawing: drawingSchema.nullable() }).nullable() }) });
 // A page of the tutorial was opened: its example plays bubble by bubble only the first time.
 export const tutorialSeenRpc = defineRpc({ name: "setup.tutorial.seen", input: z.object({ id: z.string() }), output: z.object({ ok: z.boolean() }) });
+// "Got it" (the owner, 2026-10-14): the user ticks a page they have read (server/tutorial.ts gotIt).
+export const tutorialGotItRpc = defineRpc({ name: "setup.tutorial.gotit", input: z.object({ id: z.string() }), output: z.object({ ok: z.boolean() }) });
 export const tutorialDiscussRpc = defineRpc({ name: "setup.tutorial.discuss", input: z.object({ itemId: z.string() }),
   output: z.object({ ok: z.boolean(), agentId: z.string().optional(), citizen: z.string().optional(), message: z.string() }) });
 export const finishRpc = defineRpc({ name: "setup.finish", input: z.object({}), output: z.object({ ok: z.boolean() }) });
