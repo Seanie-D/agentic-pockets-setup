@@ -40,7 +40,7 @@ export const welcomeReadRpc = defineRpc({ name: "setup.welcome.read", input: z.o
 export const welcomeDismissRpc = defineRpc({ name: "setup.welcome.dismiss", input: z.object({}), output: z.object({ seen: z.boolean() }) });
 // The tutorial (ticket 009): the house's checklist with each item's tick, the percent, the sidebar label, the reward.
 // The Setup / Help button in each citizen's workspace (shared/help-button.ts).
-export const helpButtonRpc = defineRpc({ name: "setup.helpbutton.read", input: z.object({}), output: z.object({ workspaceIds: z.array(z.string()), label: z.enum(["Setup", "Help"]) }) });
+export const helpButtonRpc = defineRpc({ name: "setup.helpbutton.read", input: z.object({}), output: z.object({ workspaceIds: z.array(z.string()), label: z.enum(["Setup", "Help!"]) }) });
 export const tutorialReadRpc = defineRpc({ name: "setup.tutorial.read", input: z.object({}), output: z.object({
   items: z.array(z.object({ id: z.string(), icon: z.string().optional(), title: z.string(), body: z.string(), done: z.object({ at: z.string(), by: z.string() }).nullable(),
     lines: z.array(z.object({ text: z.string() })).optional(), example: z.array(z.object({ from: z.enum(["you", "citizen"]), text: z.string() })).optional() })),

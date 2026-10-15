@@ -4,7 +4,7 @@ import { helpButtonRpc } from "../shared/contracts";
 // The Setup / Help button in each citizen's workspace (the owner, 2026-10-15: setup must be reachable with the sidebar
 // off). The server names the workspaces and the word (shared/help-button.ts); a press opens the setup screen. Checked
 // every minute, so a citizen added later gets one, and the word turns to Help when the tutorial is complete.
-let word: "Setup" | "Help" = "Setup";
+let word: "Setup" | "Help!" = "Setup";
 
 export function addHelpButtons(client: PluginClientContext): () => void {
   const buttons = new Map<string, PluginButtonRegistration>();
@@ -20,12 +20,12 @@ export function addHelpButtons(client: PluginClientContext): () => void {
       word = label;
       for (const id of workspaceIds) {
         const had = buttons.get(id);
-        if (had) { if (changed) had.update({ label, title: `Agentic Pockets ${label}`, icon: "Sparkles" }); continue; }
+        if (had) { if (changed) had.update({ label, title: label === "Setup" ? "Agentic Pockets Setup" : "Agentic Pockets Help", icon: "Sparkles" }); continue; }
         try {
           buttons.set(id, client.addHeaderButton({
             id: "setup-help",
             workspaceId: id,
-            button: { title: `Agentic Pockets ${label}`, label, icon: "Sparkles", behavior: { kind: "action", onPress: () => client.openScreen({ screenId: "setup" }) } },
+            button: { title: label === "Setup" ? "Agentic Pockets Setup" : "Agentic Pockets Help", label, icon: "Sparkles", behavior: { kind: "action", onPress: () => client.openScreen({ screenId: "setup" }) } },
           }));
         } catch (e) { console.warn(`[agentic-pockets-setup] no ${label} button on ${id}:`, e); }
       }

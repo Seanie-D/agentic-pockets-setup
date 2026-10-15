@@ -16,9 +16,10 @@ test("no house record, no desks, or a row with no workspace: no button", () => {
   assert.deepEqual(helpButton({ desks: { Jarvis: {}, Ultron: { workspaceId: "" }, Vision: { workspaceId: 7 } } }, false).workspaceIds, []);
 });
 
-test("it says Setup until the tutorial is complete, then Help", () => {
+// The owner on TH5, 2026-10-15 12:41 CDT: "One small tweak I want for it, is for it to say \"Help!\"".
+test("it says Setup until the tutorial is complete, then Help!", () => {
   assert.equal(helpButton({}, false).label, "Setup");
-  assert.equal(helpButton({}, true).label, "Help");
+  assert.equal(helpButton({}, true).label, "Help!");
 });
 
 // TH5, 2026-10-15 (Friday): Verro and Vision each had a second workspace that house.json does not name. The Life map
