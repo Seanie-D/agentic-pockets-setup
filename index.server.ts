@@ -8,7 +8,7 @@ import { deps, discussDeps, exec, rewardDeps, startSignIn } from "./server/real"
 import { profileDir, signedIn, signedInTo } from "./server/profile";
 import { ask, discuss } from "./server/discuss";
 import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc, tutorialGotItRpc, profileStatusRpc, profileSignInRpc, claudeStatusRpc, claudeSignInRpc, welcomeDismissRpc, welcomeReadRpc, modeSetRpc, askRpc, firstTurnRpc, helpButtonRpc } from "./shared/contracts";
-import { helpButton } from "./shared/help-button";
+import { helpButton, type WorkspaceRecord } from "./shared/help-button";
 import { markWelcomeSeen, welcomeSeen } from "./server/welcome";
 import { gotIt, markSeen, readTutorial, realProbe, stateTicks } from "./server/tutorial";
 import { rewardPass } from "./server/reward";
@@ -64,7 +64,10 @@ export default function contribute(server: PluginServerContext) {
   });
   server.handle(helpButtonRpc, async () => {
     let rec: unknown = null; try { rec = JSON.parse(fs.readFileSync(path.join(ROOT, "house.json"), "utf8")); } catch { /* no house yet */ }
-    return helpButton(rec, rec ? readTutorial(ROOT).complete : false);
+    // Paseo's own record of every workspace, read only: a citizen's second workspace gets the button too.
+    let ws: unknown[] = [];
+    try { const w = JSON.parse(fs.readFileSync(path.join(process.env.PASEO_HOME || path.join(os.homedir(), ".paseo"), "projects", "workspaces.json"), "utf8")); ws = Array.isArray(w) ? w : Object.values(w.workspaces ?? w); } catch { /* none readable */ }
+    return helpButton(rec, rec ? readTutorial(ROOT).complete : false, ROOT, ws.filter((x): x is WorkspaceRecord => !!x && typeof x === "object"));
   });
   server.handle(tutorialSeenRpc, async ({ id }) => { markSeen(ROOT, id); return { ok: true }; });
   server.handle(tutorialGotItRpc, async ({ id }) => { gotIt(ROOT, id, new Date().toISOString()); return { ok: true }; });
