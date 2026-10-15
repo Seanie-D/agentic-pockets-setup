@@ -18,7 +18,7 @@ function upstream() {
   for (const n of ["Ultron", "Jarvis", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
   return u;
 }
-function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[]; pin?: () => Promise<string | null>; pinNode?: (ids: string[]) => Promise<string | null>; deskOf?: (cwd: string) => Promise<string | null>; release?: object } = {}) {
+function world(opts: { repo?: string; claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[]; pin?: () => Promise<string | null>; pinNode?: (ids: string[]) => Promise<string | null>; deskOf?: (cwd: string) => Promise<string | null>; release?: object } = {}) {
   const up = upstream();
   if (opts.release) fs.writeFileSync(path.join(up, "RELEASE.json"), JSON.stringify(opts.release));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-")); const root = path.join(home, "agentic-pockets");
@@ -35,7 +35,7 @@ function world(opts: { claim?: number; cafeFails?: boolean; chatFails?: boolean;
     fetch: async (url, init) => {
       posts.push({ url, body: JSON.parse(String(init?.body)) });
       const s = opts.claim ?? 200;
-      return new Response(JSON.stringify(s === 200 ? { repo: "git@github.com:Seanie-D/agentic-pockets.git" } : { error: "this invite has already been used" }), { status: s });
+      return new Response(JSON.stringify(s === 200 ? { repo: opts.repo ?? "git@github.com:Seanie-D/agentic-pockets.git" } : { error: "this invite has already been used" }), { status: s });
     },
     ops: {
       createWorkspace: async ({ dir, title }) => { log.push(`workspace ${title} ${dir}`); return { workspaceId: `wks_${title}`, projectId: `prj_${title}` }; },
@@ -89,6 +89,22 @@ test("a used invite stops the run before anything is downloaded, and says so pla
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
   assert.equal(r.ok, false); assert.match(r.message, /already been used/);
   assert.ok(!w.log.some((l) => l.startsWith("git clone")) && !fs.existsSync(w.root));
+});
+
+// Item 7 of the next update: the invite service's answer is outside text, and on Windows the clone runs through cmd, where
+// % and a quote with & would expand or run. Only a plain git address goes to git.
+test("a strange download address from the invite service is refused before anything is downloaded", async () => {
+  for (const repo of ['git@github.com:x/y.git" & calc & "', "https://github.com/x/%PATH%.git", "git@github.com:x/y.git\nrm -rf ~", "--upload-pack=touch /tmp/x", "ext::sh -c touch% /tmp/pwned", "-oProxyCommand=calc@host:x.git", "git@-oProxyCommand=x:y.git", "git@github.com:-x/y.git"]) {
+    const w = world({ repo });
+    const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps);
+    assert.equal(r.ok, false, repo);
+    assert.match(r.message, /download address .* not one setup can trust/, repo);
+    assert.ok(!w.log.some((l) => l.startsWith("git clone")), `no clone for ${repo}`);
+  }
+  for (const repo of ["git@github.com:Seanie-D/agentic-pockets.git", "https://github.com/Seanie-D/agentic-pockets.git", "ssh://git@github.com/Seanie-D/agentic-pockets.git"]) {
+    const w = world({ repo });
+    assert.equal((await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home }, w.deps)).ok, true, repo);
+  }
 });
 
 test("an existing pocket of the user's is never overwritten on a second run", async () => {

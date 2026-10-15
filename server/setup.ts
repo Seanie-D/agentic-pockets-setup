@@ -65,6 +65,10 @@ export function packsIn(root: string): { name: string; hello: string }[] {
   });
 }
 
+// A plain git address: git@host:owner/repo(.git), or ssh:// or https:// with a plain host and path. No spaces, quotes,
+// %, &, or a dash at the head of a part, so neither git nor Windows cmd can read it as anything but an address (item 7).
+export const PLAIN_REPO = /^(?:\w[\w.-]*@\w[\w.-]*:|(?:ssh|https):\/\/(?:\w[\w.-]*@)?\w[\w.-]*(?::\d+)?\/)[\w.~\/][\w.~\/-]*$/;
+
 // Git's ssh line for the house key. Git runs it through sh, also on Windows, so the path is one quoted word with
 // forward slashes: sh dropped the backslashes and split at a space.
 export const sshCommand = (key: string) =>
@@ -95,6 +99,9 @@ export async function connect(input: Pick<SetupInput, "code" | "root" | "home">,
     catch (e) { return fail(`Could not reach the invite service. Check the internet connection and try again. (${String((e as Error).message).slice(0, 120)})`); }
     const body = await res.json().catch(() => ({})) as { repo?: string; error?: string };
     if (!res.ok || !body.repo) return fail(res.status === 409 ? "This invite has already been used. Ask the person who invited you for a new one." : res.status === 404 ? "That invite code is not known. Check it, or ask for a new one." : `The invite was not accepted: ${body.error ?? res.status}`);
+    // Item 7: the address is outside text, and on Windows the clone runs through cmd, where % and a quote with & expand or
+    // run. Only a plain git address (ssh, https, or user@host:path) goes on to git.
+    if (!PLAIN_REPO.test(body.repo)) return fail("The invite service sent a download address that is not one setup can trust, so nothing was downloaded. Ask the person who invited you.");
     steps.push("Your invite was accepted.");
     fs.mkdirSync(input.root, { recursive: true });
     const r = deps.exec("git", ["clone", "--depth", "50", body.repo, upstream], { env: { GIT_SSH_COMMAND: ssh } });
