@@ -142,3 +142,11 @@ test("Got it and a citizen's explanation: the first one counts", () => {
   gotIt(h.root, "desk", "2026-10-14T18:30:00Z");
   assert.deepEqual(readTutorial(h.root).items.find((i) => i.id === "desk")!.done, { at: "2026-10-14T09:00:00Z", by: "Verro" });
 });
+
+// The owner, 2026-10-15 13:08 CDT: once install is done the sidebar says "Agentic Pockets Help", tutorial or not.
+test("the sidebar label says Help once setup is done, before the tutorial is complete", () => {
+  const h = house();
+  h.w("house.json", JSON.stringify({ setupDone: true }));
+  const t = readTutorial(h.root);
+  assert.equal(t.complete, false); assert.equal(t.label, LABEL_AFTER);
+});

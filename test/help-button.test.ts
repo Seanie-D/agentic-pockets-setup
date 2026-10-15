@@ -35,3 +35,10 @@ test("a citizen's other live workspaces in its own folder get the button too; an
   ]);
   assert.deepEqual(b.workspaceIds.sort(), ["w-1", "w-2", "w-3"]);
 });
+
+// The owner, 2026-10-15 13:08 CDT: "after install, it does say Agentic Pockets Help and then the button up top actually
+// legit says \"Help!\"". Install is done when the house record says setupDone (the user pressed Finish setup).
+test("it says Help! once setup is done, with the tutorial not yet complete", () => {
+  assert.equal(helpButton({ setupDone: true }, false).label, "Help!");
+  assert.equal(helpButton({ setupDone: false }, false).label, "Setup");
+});

@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { drawingSchema, type Drawing } from "../shared/reward.ts";
 
-export const LABEL_DURING = "Agentic Pockets Setup";   // the owner, Q1c 2026-10-12: Setup until complete, then Help
+export const LABEL_DURING = "Agentic Pockets Setup";   // the owner, Q1c 2026-10-12: Setup until complete, then Help; 2026-10-15 13:08 CDT: Help from setupDone
 export const LABEL_AFTER = "Agentic Pockets Help";
 
 export interface Line { text: string; needs?: string }
@@ -69,7 +69,7 @@ export function readTutorial(root: string, probe: Probe = realProbe(root)): Tuto
     reward = { citizen: lead, drawing: r.success ? r.data : null };
   }
   const seen = ((readJson(path.join(root, "house.json"))?.tutorialSeen ?? []) as string[]).filter((s) => typeof s === "string");
-  return { items, seen, lead, percent: items.length ? Math.round((done / items.length) * 100) : 0, complete, label: complete ? LABEL_AFTER : LABEL_DURING, reward };
+  return { items, seen, lead, percent: items.length ? Math.round((done / items.length) * 100) : 0, complete, label: complete || readJson(path.join(root, "house.json"))?.setupDone === true ? LABEL_AFTER : LABEL_DURING, reward };
 }
 
 // The owner on Q3a, ticket 009: tick a setup item "only if the setup is actually done when the tutorial starts". Each
