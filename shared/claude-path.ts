@@ -12,12 +12,6 @@ export function findCommand(dirs: string[], names: string[], sep: string, isFile
 }
 
 type Providers = Record<string, Record<string, unknown> | undefined>;
-// Paseo's providers with claude's command set to the path setup found; null when nothing should change: Paseo finds
-// Claude itself, the user already set a command, or setup found no Claude.
-export function pinClaude(providers: Providers, found: string | null, paseoFinds: string | null): Providers | null {
-  if (!found || paseoFinds || providers.claude?.command) return null;
-  return { ...providers, claude: { ...(providers.claude ?? {}), command: [found] } };
-}
 
 // Paseo's Claude providers given a PATH that starts with the folder setup found Node in (Friday's read of the owner's
 // 15:51 walk, 2026-10-13: Node in /opt/homebrew/bin, a desk's PATH without it, so no boot or clock hook ran). `claude`
@@ -39,4 +33,62 @@ export function pinNode(providers: Providers, ids: string[], nodeDir: string | n
     changed = true;
   }
   return changed ? out : null;
+}
+
+// Item 7a of the next update (the owner, Ultron's desk, 2026-10-15 16:15 CDT: "adapt to any possible weird which-way that
+// someone has their Claude Code installed"). Setup finds every copy in Paseo's own PATH order, knows where each came
+// from, picks the newest one new enough, and tells Paseo to use it, so nobody removes or updates anything by hand. An old
+// copy is updated only by its own route.
+export type Origin = "Anthropic's installer" | "Homebrew" | "npm" | "npm under nvm" | "Volta" | "winget" | "an app";
+export interface ClaudeCopy { at: string; version: string | null; from: Origin | null }
+
+// Where a copy came from, read from where its command really lives (its link followed).
+export function originOf(real: string): Origin | null {
+  const p = real.replace(/\\/g, "/");
+  if (/\/\.volta\//.test(p)) return "Volta";
+  if (/node_modules\/@anthropic-ai\/claude-code/.test(p)) return /\/\.nvm\//.test(p) ? "npm under nvm" : "npm";
+  if (/\/(Caskroom|Cellar)\//.test(p)) return "Homebrew";
+  if (/\/\.local\/share\/claude\//.test(p) || /\/\.local\/bin\/claude\.exe$/i.test(p)) return "Anthropic's installer";
+  if (/\/WinGet\/(Packages|Links)\//i.test(p)) return "winget";
+  if (/\.app\/Contents\//.test(p)) return "an app";
+  return null;
+}
+
+const newer = (a: string, b: string) => { const x = a.split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i]; return false; };
+export const goodEnough = (v: string | null, need: string): v is string => !!v && !newer(need, v);
+
+// The newest copy new enough; the first such one in Paseo's order when two have the same version.
+export function pickClaude(copies: ClaudeCopy[], need: string): ClaudeCopy | null {
+  let best: ClaudeCopy | null = null;
+  for (const c of copies) if (goodEnough(c.version, need) && (!best || newer(c.version!, best.version!))) best = c;
+  return best;
+}
+
+// Paseo's providers with claude's command set to the good copy; null when nothing should change: Paseo already runs a good
+// copy (paseoRuns: the copy Paseo's own PATH finds first), its command already names a good copy, its command is one setup
+// cannot read (the user's own wrapper), or no copy is new enough.
+export function choosePin(providers: Providers, copies: ClaudeCopy[], paseoRuns: string | null, need: string): Providers | null {
+  const good = pickClaude(copies, need);
+  if (!good) return null;
+  const set = (providers.claude?.command as string[] | undefined)?.[0];
+  if (set) {
+    const known = copies.find((c) => c.at === set);
+    if (!known || goodEnough(known.version, need)) return null;
+  } else if (paseoRuns && goodEnough(copies.find((c) => c.at === paseoRuns)?.version ?? null, need)) return null;
+  return { ...providers, claude: { ...(providers.claude ?? {}), command: [good.at] } };
+}
+
+// How an old copy updates, by its own route only: Anthropic's copy updates itself; Homebrew, npm (the npm beside that copy,
+// so an nvm copy is updated in its own Node), Volta and winget each by their own command. An app, or a copy from nowhere
+// known, has none: setup names it instead.
+export function updateRoute(c: ClaudeCopy, platform: string): string[] | null {
+  const dir = c.at.replace(/[\\/][^\\/]+$/, ""), sep = platform === "win32" ? "\\" : "/";
+  switch (c.from) {
+    case "Anthropic's installer": return [c.at, "update"];
+    case "Homebrew": return ["brew", "upgrade", "--cask", "claude-code"];
+    case "npm": case "npm under nvm": return [`${dir}${sep}npm${platform === "win32" ? ".cmd" : ""}`, "install", "-g", "@anthropic-ai/claude-code@latest"];
+    case "Volta": return ["volta", "install", "@anthropic-ai/claude-code@latest"];
+    case "winget": return ["winget", "upgrade", "--id", "Anthropic.ClaudeCode", "--exact", "--silent", "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"];
+    default: return null;
+  }
 }

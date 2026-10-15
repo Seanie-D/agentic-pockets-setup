@@ -13,7 +13,8 @@ import type { AgentRecord, DiscussDeps } from "./discuss";
 import type { RewardDeps } from "./reward";
 import { WELCOME_KIND } from "../shared/desk-welcome";
 import { cmdLine, joinPath, registryPath, withPath } from "../shared/winpath";
-import { findCommand, pinClaude, pinNode } from "../shared/claude-path";
+import { choosePin, findCommand, pinNode } from "../shared/claude-path";
+import { claudeCopies, NEED_CLAUDE } from "./tools";
 import { workspaceFor } from "../shared/workspace";
 
 export const DOORMAN = "https://pockets-doorman.sank-junior-purple.workers.dev";
@@ -118,20 +119,17 @@ export function ops(paseo: PaseoApi): Ops {
       }
       fs.mkdirSync(path.join(dir, "node_modules"), { recursive: true }); fs.writeFileSync(path.join(dir, "node_modules", BUILT), "");
     },
-    // Claude where setup finds it but Paseo, on its own PATH, does not (~/.local/bin on the Mac): Paseo gets the full path.
+    // Claude where setup finds it but Paseo, on its own PATH, does not (~/.local/bin on the Mac), or where the copy Paseo
+    // runs is too old and a newer one is here (item 7a): Paseo gets the good copy's full path (shared/claude-path.ts choosePin).
     async pinClaude() {
       const names = process.platform === "win32" ? ["claude.exe"] : ["claude"];
       const isFile = (p: string) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
-      const found = findCommand(pathEnv().split(path.delimiter), names, path.sep, isFile);
       const paseoFinds = findCommand((process.env.PATH ?? "").split(path.delimiter), names, path.sep, isFile);
+      const copies = claudeCopies(exec, process.platform, fs.realpathSync);
       const { config } = await paseo.config.get();
-      const providers = pinClaude((config as { providers?: Record<string, Record<string, unknown>> }).providers ?? {}, found, paseoFinds);
+      const providers = choosePin((config as { providers?: Record<string, Record<string, unknown>> }).providers ?? {}, copies, paseoFinds, NEED_CLAUDE);
       if (!providers) return null;
-      await paseo.config.patch({ providers } as Parameters<PaseoApi["config"]["patch"]>[0]);
-      // A reload applied it at once on a test Paseo; the patch alone is untested, so a failed reload is said.
-      const r = exec("paseo", ["reload"]);
-      if (r.status !== 0) throw new Error(`Paseo has the path ${found}, but did not reload; quit and reopen Paseo`);
-      return found;
+      return pointClaude(paseo, providers);
     },
     // Node's folder, where setup finds Node but a desk's PATH (Paseo's own) does not hold it.
     async pinNode(ids) {
@@ -205,4 +203,26 @@ export function startSignIn(configDir: string | null): { started: boolean; messa
     c.unref();
     return { started: true, message: "Your browser opens to sign in to Claude. Come back here when it says you are signed in." };
   } catch (e) { return { started: false, message: `The sign-in did not start: ${String((e as Error)?.message ?? e).slice(0, 160)}` }; }
+}
+
+// Item 7a: Paseo's providers with claude's command set, given to Paseo, and Paseo reloaded so new desks use it. The path
+// set is returned. A reload applied it at once on a test Paseo; the patch alone is untested, so a failed reload is said.
+async function pointClaude(paseo: PaseoApi, providers: Record<string, Record<string, unknown> | undefined>): Promise<string> {
+  const at = String((providers.claude?.command as string[])[0]);
+  await paseo.config.patch({ providers } as Parameters<PaseoApi["config"]["patch"]>[0]);
+  const r = exec("paseo", ["reload"]);
+  if (r.status !== 0) throw new Error(`Paseo has the path ${at}, but did not reload; quit and reopen Paseo`);
+  return at;
+}
+// The copy of Claude Code Paseo's claude provider is set to, when it is: the one the house runs (item 7a).
+export async function claudeSet(paseo: PaseoApi): Promise<string | null> {
+  const { config } = await paseo.config.get().catch(() => ({ config: {} }));
+  const c = (config as { providers?: Record<string, { command?: unknown }> }).providers?.claude?.command;
+  return Array.isArray(c) && typeof c[0] === "string" ? c[0] : null;
+}
+// The Install button chose a copy (installTools' pin): Paseo is told to use it, keeping the rest of its claude settings.
+export async function useClaude(paseo: PaseoApi, at: string): Promise<string> {
+  const { config } = await paseo.config.get();
+  const providers = (config as { providers?: Record<string, Record<string, unknown>> }).providers ?? {};
+  return pointClaude(paseo, { ...providers, claude: { ...(providers.claude ?? {}), command: [at] } });
 }

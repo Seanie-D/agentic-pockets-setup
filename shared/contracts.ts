@@ -4,7 +4,7 @@ import { z } from "zod";
 import { drawingSchema } from "./reward.ts";
 
 const Tool = z.object({ name: z.string(), state: z.enum(["ok", "old", "missing"]), have: z.string().nullable(), need: z.string(), why: z.string() });
-const Installed = Tool.extend({ action: z.enum(["kept", "installed", "updated", "not done"]), message: z.string().optional() });
+const Installed = Tool.extend({ action: z.enum(["kept", "installed", "updated", "not done"]), message: z.string().optional(), pin: z.string().optional() });
 const Extra = z.object({ id: z.string(), kind: z.enum(["hook", "skill", "agent", "command", "plugin", "mcp", "instructions", "paseo"]), name: z.string(), where: z.string(),
   switchable: z.boolean(), file: z.string().optional() });
 // running: the step is still at work (shared/job.ts); the screen calls again, and the same job answers.

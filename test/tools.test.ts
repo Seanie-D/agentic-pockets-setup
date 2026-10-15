@@ -269,29 +269,28 @@ test("a Claude Code too old for the release's models is old, so setup offers the
 
 // Nick's setup on 1.0.1, 2026-10-14 15:52 CDT: Claude Code 2.1.220 read too old, Install ran, and the check said
 // "claude is still too old after the install": the installer's new copy went to ~/.local/bin, and an old npm copy in
-// /usr/local/bin still ran first. Setup now names every copy, the one that runs first and where it came from, and how
-// to remove it; it removes nothing itself.
-test("Claude Code still too old after the install: setup names the old copy that runs first and how to remove it", () => {
+// /usr/local/bin still ran first. Item 7a (the owner, 2026-10-15 16:15 CDT): setup now tells Paseo to use the newer copy
+// at once, and installs, updates and removes nothing.
+test("an old npm copy runs first and a newer copy is here: Paseo is told to use the newer one; nothing is installed or removed", () => {
   const OLD = "/usr/local/bin/claude", NEW = "/Users/nick/.local/bin/claude";
   const real: Record<string, string> = { [OLD]: "/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js", [NEW]: "/Users/nick/.local/share/claude/versions/2.1.290" };
   const VER: Record<string, string> = { claude: "2.1.220", [OLD]: "2.1.220", [NEW]: "2.1.290", node: "24.16.0", git: "2.43.0", paseo: "0.11.2" };
+  const calls: string[] = [];
   const run = (cmd: string, args: string[]) => {
+    calls.push([cmd, ...args].join(" "));
     if (args[0] === "--version" && cmd in VER) return { status: 0, stdout: `${VER[cmd]} (x)\n` };
     if (cmd === "which" && args.join(" ") === "-a claude") return { status: 0, stdout: `${OLD}\n${NEW}\n` };
-    if (cmd === "sh") return { status: 0, stdout: "" };   // the installer runs, and the old copy still runs first
     return { status: 1, stdout: "" };
   };
   const r = installTools(run, "darwin", () => true, (p) => real[p] ?? p).find((t) => t.name === "claude")!;
-  assert.equal(r.action, "not done");
-  assert.match(r.message!, /\/usr\/local\/bin\/claude \(2\.1\.220, an npm install\) runs first/);
-  assert.match(r.message!, /\/Users\/nick\/\.local\/bin\/claude \(2\.1\.290\)/);
-  assert.match(r.message!, /sudo npm uninstall -g @anthropic-ai\/claude-code/);
-  assert.match(r.message!, /quit Paseo, open it again, and press Check again/);
+  assert.deepEqual([r.state, r.action, r.have, r.pin], ["ok", "kept", "2.1.290", NEW]);
+  assert.match(r.message!, /Paseo now uses your newer copy of Claude Code, 2\.1\.290, at \/Users\/nick\/\.local\/bin\/claude\. Nothing was installed or removed\./);
+  assert.ok(!calls.some((c) => /^(sh|npm|sudo)\b/.test(c) || /^brew (install|upgrade)/.test(c) || c.endsWith(" update")), calls.join("\n"));
 });
 
-// Nick's real case (Sean's photo, 15:55 CDT): the copy that ran first was Anthropic's own install in ~/.local/bin, at
-// 2.1.220; Homebrew's copy came after it. `claude update` fixed it. Setup now runs that copy's own update itself.
-test("Claude Code still too old because Anthropic's own older install runs first: setup updates that copy itself", () => {
+// Nick's real case (Sean's photo, 15:55 CDT): Anthropic's own install ran first at 2.1.220; Homebrew's 2.1.300 came after
+// it. With item 7a the newer Homebrew copy is used as it is: no update is run.
+test("an old copy of Anthropic's own runs first and Homebrew's is newer: Paseo uses Homebrew's; nothing is updated", () => {
   const LOCAL = "/Users/nickloux/.local/bin/claude", BREW = "/opt/homebrew/bin/claude";
   const real: Record<string, string> = { [LOCAL]: "/Users/nickloux/.local/share/claude/versions/2.1.220", [BREW]: "/opt/homebrew/Caskroom/claude-code/2.1.300/claude" };
   const VER: Record<string, string> = { claude: "2.1.220", [LOCAL]: "2.1.220", [BREW]: "2.1.300", node: "24.16.0", git: "2.43.0", paseo: "0.11.2", brew: "4.0.0" };
@@ -299,17 +298,30 @@ test("Claude Code still too old because Anthropic's own older install runs first
   const run = (cmd: string, args: string[]) => {
     calls.push([cmd, ...args].join(" "));
     if (args[0] === "--version" && cmd in VER) return { status: 0, stdout: `${VER[cmd]} (x)\n` };
-    if (cmd === "brew" && args[0] === "--prefix") return { status: 0, stdout: "/opt/homebrew\n" };
-    if (cmd === "brew" && args[0] === "list") return { status: 0, stdout: "claude-code 2.1.300" };
-    if (cmd === "brew") return { status: 0, stdout: "" };
     if (cmd === "which" && args.join(" ") === "-a claude") return { status: 0, stdout: `${LOCAL}\n${BREW}\n${BREW}\n` };
-    if (cmd === LOCAL && args[0] === "update") { VER[LOCAL] = VER.claude = "2.1.300"; return { status: 0, stdout: "Successfully updated from 2.1.220 to version 2.1.300\n" }; }
     return { status: 1, stdout: "" };
   };
   const r = installTools(run, "darwin", () => true, (p) => real[p] ?? p).find((t) => t.name === "claude")!;
+  assert.deepEqual([r.state, r.action, r.pin], ["ok", "kept", BREW]);
+  assert.ok(!calls.includes(`${LOCAL} update`) && !calls.some((c) => /^brew (install|upgrade)/.test(c)), calls.join("\n"));
+});
+
+// With no copy new enough, the copy that runs first is updated by its own route: Anthropic's copy by itself.
+test("only an old copy of Anthropic's own: it updates itself, and nothing else is installed", () => {
+  const LOCAL = "/Users/nickloux/.local/bin/claude";
+  const VER: Record<string, string> = { claude: "2.1.220", [LOCAL]: "2.1.220", node: "24.16.0", git: "2.43.0", paseo: "0.11.2" };
+  const calls: string[] = [];
+  const run = (cmd: string, args: string[]) => {
+    calls.push([cmd, ...args].join(" "));
+    if (args[0] === "--version" && cmd in VER) return { status: 0, stdout: `${VER[cmd]} (x)\n` };
+    if (cmd === "which" && args.join(" ") === "-a claude") return { status: 0, stdout: `${LOCAL}\n` };
+    if (cmd === LOCAL && args[0] === "update") { VER[LOCAL] = VER.claude = "2.1.300"; return { status: 0, stdout: "Successfully updated\n" }; }
+    return { status: 1, stdout: "" };
+  };
+  const r = installTools(run, "darwin", () => true, () => "/Users/nickloux/.local/share/claude/versions/2.1.220").find((t) => t.name === "claude")!;
   assert.ok(calls.includes(`${LOCAL} update`), calls.join("\n"));
-  assert.equal(r.state, "ok"); assert.equal(r.action, "updated"); assert.equal(r.have, "2.1.300");
-  assert.equal(r.message, undefined);
+  assert.deepEqual([r.state, r.action, r.have, r.pin], ["ok", "updated", "2.1.300", undefined]);
+  assert.ok(!calls.some((c) => c.startsWith("sh ") || /^brew (install|upgrade)/.test(c)), "no other install");
 });
 
 // Sean, 16:13 CDT: "claude update did NOT help John's case, but it DID help Nick's." A Homebrew copy updates only through

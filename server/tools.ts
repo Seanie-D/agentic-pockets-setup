@@ -2,6 +2,7 @@
 // installTools runs only when the user asks: kept if new enough, updated if old, installed if missing.
 import fs from "node:fs";
 import path from "node:path";
+import { originOf, pickClaude, updateRoute, type ClaudeCopy } from "../shared/claude-path.ts";
 
 export type Run = (cmd: string, args: string[]) => { status: number | null; stdout: string };
 export interface Tool { name: string; state: "ok" | "old" | "missing"; have: string | null; need: string; why: string }
@@ -17,11 +18,13 @@ const NEED: { name: string; args: string[]; need: string; why: string }[] = [
 const ver = (s: string) => (s.match(/(\d+)\.(\d+)\.(\d+)/) || [])[0] ?? null;
 const older = (a: string, b: string) => { const x = a.split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i]; return false; };
 
-export function checkTools(run: Run): Tool[] {
-  return NEED.map((t) => checkOne(run, t));
+// claudeAt: the command Paseo's claude provider is set to, when it is (item 7a): that copy is the one the house runs.
+export function checkTools(run: Run, claudeAt: string | null = null): Tool[] {
+  return NEED.map((t) => checkOne(run, t, claudeAt));
 }
-function checkOne(run: Run, t: (typeof NEED)[number]): Tool {
-  const r = run(t.name, t.args);
+export const NEED_CLAUDE = NEED.find((t) => t.name === "claude")!.need;
+function checkOne(run: Run, t: (typeof NEED)[number], claudeAt: string | null = null): Tool {
+  const r = run(t.name === "claude" && claudeAt ? claudeAt : t.name, t.args);
   const have = r.status === 0 ? ver(r.stdout) : null;
   // This plugin runs inside Paseo, and Paseo refuses to run it below the manifest's minimum (0.11.2): with no command
   // found, Paseo is still here (Friday's Windows walk, 2026-10-12: the app's command is not on PATH).
@@ -52,7 +55,8 @@ const MAC_NO_BREW: Record<string, string> = {
   claude: "curl -fsSL https://claude.ai/install.sh | bash",
 };
 
-export interface Installed extends Tool { action: "kept" | "installed" | "updated" | "not done"; message?: string }
+// pin: the copy of Claude Code Paseo should be told to use (item 7a); the server's handler tells it.
+export interface Installed extends Tool { action: "kept" | "installed" | "updated" | "not done"; message?: string; pin?: string }
 
 const lastLine = (out: string) => out.trim().split(/\r?\n/).filter(Boolean).pop()?.slice(0, 200) ?? "";
 
@@ -63,32 +67,35 @@ const canWrite = (dir: string) => { try { fs.accessSync(dir, fs.constants.W_OK);
 // Every copy of Claude Code this setup can reach, the one that runs first at the top, each with its version and where it
 // came from (from where its command really lives). Nick's setup, 2026-10-14: the installer's new copy went to ~/.local/bin
 // and an old npm copy in /usr/local/bin still ran first, so the check said "still too old" after the install.
-interface Copy { at: string; version: string | null; from: "npm" | "Homebrew" | "Anthropic's installer" | null }
-function claudeCopies(run: Run, platform: NodeJS.Platform, resolve: (p: string) => string): Copy[] {
+// Every copy, in the order setup's own PATH (Paseo's, then the folders setup adds) finds them (item 7a: Paseo's order,
+// not Terminal's); each copy's origin is read in shared/claude-path.ts.
+type Copy = ClaudeCopy;
+export function claudeCopies(run: Run, platform: NodeJS.Platform, resolve: (p: string) => string): Copy[] {
   const r = platform === "win32" ? run("where", ["claude"]) : run("which", ["-a", "claude"]);
   if (r.status !== 0) return [];
   return [...new Set(r.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean))].map((at) => {
     let real = at; try { real = resolve(at); } catch { /* a broken link: its own path */ }
     const v = run(at, ["--version"]);
-    const from = /node_modules[\\/]@anthropic-ai[\\/]claude-code/.test(real) ? "npm" : /Caskroom/.test(real) ? "Homebrew" : /[\\/]\.local[\\/]share[\\/]claude[\\/]/.test(real) ? "Anthropic's installer" : null;
-    return { at, version: v.status === 0 ? ver(v.stdout) : null, from };
+    return { at, version: v.status === 0 ? ver(v.stdout) : null, from: originOf(real) ?? originOf(at) };
   });
 }
-const REMOVE: Record<string, (platform: NodeJS.Platform) => string> = {
+const REMOVE: Partial<Record<string, (platform: NodeJS.Platform) => string>> = {
   npm: (p) => `${p === "win32" ? "" : "sudo "}npm uninstall -g @anthropic-ai/claude-code`,
 };
+const fromWords = (c: Copy) => (c.from ? (c.from.startsWith("npm") ? `${c.from === "npm" ? "an npm install" : "an npm install under nvm"}` : `from ${c.from}`) : "");
 // The plain-words message when Claude Code is still too old after the install: which copy runs first and why, the newer
 // copy when there is one, and how to remove the old one. Setup removes nothing itself.
 function stillOld(copies: Copy[], need: string, platform: NodeJS.Platform): string | null {
   const first = copies[0];
   if (!first || (first.version && !older(first.version, need))) return null;
   const newer = copies.find((c) => c.version && !older(c.version, need));
-  const what = [first.version, first.from && `${first.from === "npm" ? "an npm install" : `from ${first.from}`}`].filter(Boolean).join(", ");
+  const what = [first.version, fromWords(first)].filter(Boolean).join(", ");
   const term = platform === "win32" ? "a terminal" : "Terminal";
   // How each kind updates (Sean, 16:13 CDT: "claude update did NOT help John's case, but it DID help Nick's"): Anthropic's
   // own copy updates itself; a Homebrew copy only through brew; an npm copy is removed, since a newer copy is here.
   const update = first.from === "Anthropic's installer" ? "It can update itself" : first.from === "Homebrew" ? "It updates only through Homebrew" : null;
-  const how = update ? ` ${update}: run this in ${term}: ${first.from === "Homebrew" ? "brew upgrade --cask claude-code" : "claude update"}` : first.from && REMOVE[first.from] ? ` To remove it, run this in ${platform === "win32" ? "a terminal" : "Terminal"}: ${REMOVE[first.from](platform)}` : " Ask the person who invited you how to remove it.";
+  const remove = first.from ? REMOVE[first.from] : undefined;
+  const how = update ? ` ${update}: run this in ${term}: ${first.from === "Homebrew" ? "brew upgrade --cask claude-code" : "claude update"}` : remove ? ` To remove it, run this in ${platform === "win32" ? "a terminal" : "Terminal"}: ${remove(platform)}` : " Ask the person who invited you how to remove it.";
   return `Claude Code is still too old: an older copy at ${first.at}${what ? ` (${what})` : ""} runs first.${newer ? ` The new copy is at ${newer.at} (${newer.version}).` : ""} ${update ? "Update" : "Remove"} the old copy, then quit Paseo, open it again, and press Check again.${how}`;
 }
 
@@ -100,6 +107,19 @@ export function installTools(run: Run, platform: NodeJS.Platform, writable: (dir
   return NEED.map((t) => {
     const before = checkOne(run, t);
     if (before.state === "ok") return { ...before, action: "kept" };
+    // Item 7a: Claude Code too old or not found first, and a newer copy is on this computer: Paseo is told to use that one,
+    // and nothing is installed, updated or removed. Else the copy that runs first is updated by its own route, if it has one.
+    if (t.name === "claude") {
+      const copies = claudeCopies(run, platform, resolve);
+      const good = pickClaude(copies, t.need);
+      if (good) return { ...before, state: "ok", have: good.version, action: "kept", pin: good.at, message: `Paseo now uses your newer copy of Claude Code, ${good.version}, at ${good.at}. Nothing was installed or removed.` };
+      const route = copies[0] && updateRoute(copies[0], platform);
+      if (route) {
+        run(route[0], route.slice(1));
+        const again = claudeCopies(run, platform, resolve), fresh = pickClaude(again, t.need);
+        if (fresh) return { ...before, state: "ok", have: fresh.version, action: "updated", ...(fresh.at !== again[0]?.at ? { pin: fresh.at } : {}) };
+      }
+    }
     if (t.name === "paseo") return { ...before, action: "not done", message: "Update Paseo from its own menu, or from paseo.sh." };
     const pkg = BREW[t.name];
     let why = "", wholeComputer = false;
@@ -127,14 +147,13 @@ export function installTools(run: Run, platform: NodeJS.Platform, writable: (dir
         else if (u.status !== 0) why = lastLine(u.stdout);
       }
     } else return { ...before, action: "not done", message: `Install ${t.name} ${t.need} or newer with your system's package manager.` };
-    let after = checkOne(run, t);
-    // Still too old, and the copy that runs first is Anthropic's own install: it updates itself (Nick's Mac, 2026-10-14:
-    // `claude update` was the fix). Setup runs that copy's update, then reads again.
-    if (t.name === "claude" && after.state === "old") {
-      const first = claudeCopies(run, platform, resolve)[0];
-      if (first?.from === "Anthropic's installer" && (!first.version || older(first.version, t.need))) { run(first.at, ["update"]); after = checkOne(run, t); }
-    }
+    const after = checkOne(run, t);
     const action = after.state !== "ok" ? "not done" : before.state === "missing" ? "installed" : "updated";
+    // Item 7a: the install put a new copy somewhere an old one still shadows: Paseo is told to use the new one.
+    if (t.name === "claude" && after.state !== "ok") {
+      const copies = claudeCopies(run, platform, resolve), good = pickClaude(copies, t.need);
+      if (good) return { ...after, state: "ok", have: good.version, action: before.state === "missing" ? "installed" : "updated", pin: good.at };
+    }
     const shadowed = t.name === "claude" && after.state === "old" ? stillOld(claudeCopies(run, platform, resolve), t.need, platform) : null;
     if (shadowed) return { ...after, action, message: shadowed };
     if (after.state !== "ok") return { ...after, action, message: `${t.name} is still ${after.state === "old" ? "too old" : "missing"} after the install.${why ? ` The installer said: ${why}` : ""}` };

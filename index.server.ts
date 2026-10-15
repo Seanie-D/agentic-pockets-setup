@@ -4,7 +4,7 @@ import path from "node:path";
 import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { connect, install, packsIn, setMode } from "./server/setup";
 import { checkTools, installTools, listExtras } from "./server/tools";
-import { deps, discussDeps, exec, rewardDeps, startSignIn } from "./server/real";
+import { claudeSet, deps, discussDeps, exec, rewardDeps, startSignIn, useClaude } from "./server/real";
 import { profileDir, signedIn, signedInTo } from "./server/profile";
 import { ask, discuss } from "./server/discuss";
 import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc, tutorialGotItRpc, profileStatusRpc, profileSignInRpc, claudeStatusRpc, claudeSignInRpc, welcomeDismissRpc, welcomeReadRpc, modeSetRpc, askRpc, firstTurnRpc, helpButtonRpc } from "./shared/contracts";
@@ -52,7 +52,7 @@ export default function contribute(server: PluginServerContext) {
   server.handle(status, async (_i, { paseo }) => {
     const accounts = await paseo.providers.listAvailable().then((r) => ((r as { providers?: { provider?: string; id?: string; available?: boolean }[] }).providers ?? [])
       .filter((p) => p.available !== false).map((p) => String(p.provider ?? p.id))).catch(() => ["claude"]);
-    return { tools: checkTools(exec), extras: listExtras(os.homedir()), root: ROOT, connected: fs.existsSync(path.join(ROOT, ".upstream")),
+    return { tools: checkTools(exec, await claudeSet(paseo)), extras: listExtras(os.homedir()), root: ROOT, connected: fs.existsSync(path.join(ROOT, ".upstream")),
       packs: packsIn(ROOT), accounts: accounts.length ? accounts : ["claude"], setupDone: record().setupDone === true,
       mode: record().mode === "always-on" ? "always-on" as const : "on-demand" as const,
       cafe: await paseo.config.get().then(({ config }) => !!(config as { plugins?: Record<string, unknown> }).plugins?.["paseo-cafe"]).catch(() => false),
@@ -75,7 +75,14 @@ export default function contribute(server: PluginServerContext) {
   server.handle(tutorialSeenRpc, async ({ id }) => { markSeen(ROOT, id); return { ok: true }; });
   server.handle(tutorialGotItRpc, async ({ id }) => { gotIt(ROOT, id, new Date().toISOString()); return { ok: true }; });
   server.handle(tutorialDiscussRpc, async ({ itemId }, { paseo }) => discuss(ROOT, itemId, discussDeps(paseo)));
-  server.handle(installToolsRpc, async ({ run }) => toolsJob(run, async () => { try { return { tools: installTools(exec, process.platform) }; } catch (e) { return { tools: [], failed: String((e as Error)?.message ?? e).slice(0, 300) }; } }, { tools: [], running: true }));
+  server.handle(installToolsRpc, async ({ run }, { paseo }) => toolsJob(run, async () => {
+    try {
+      const tools = installTools(exec, process.platform);
+      // Item 7a: a copy of Claude Code chosen over the one Paseo would run is given to Paseo; a failure is said on its row.
+      for (const t of tools) if (t.pin) await useClaude(paseo, t.pin).catch((e) => { t.state = "old"; t.action = "not done"; t.message = `Setup found a good copy at ${t.pin}, but could not give it to Paseo: ${String((e as Error)?.message ?? e).slice(0, 160)}`; });
+      return { tools };
+    } catch (e) { return { tools: [], failed: String((e as Error)?.message ?? e).slice(0, 300) }; }
+  }, { tools: [], running: true }));
   server.handle(connectRpc, async ({ code, run }, { paseo }) => connectJob(run, () => connect({ code, root: ROOT, home: os.homedir() }, deps(paseo)).catch(failed), BUSY));
   server.handle(profileStatusRpc, async () => ({ signedIn: signedIn(exec, os.homedir()) }));
   server.handle(profileSignInRpc, async () => startSignIn(profileDir(os.homedir())));
@@ -93,7 +100,7 @@ export default function contribute(server: PluginServerContext) {
     let ws: { workspaceId?: string; archivedAt?: string | null }[] = [];
     try { const w = JSON.parse(fs.readFileSync(path.join(process.env.PASEO_HOME || path.join(os.homedir(), ".paseo"), "projects", "workspaces.json"), "utf8")); ws = Array.isArray(w) ? w : Object.values(w.workspaces ?? w); } catch { /* none readable */ }
     return { lines: houseStatus({
-      tools: checkTools(exec), npm: exec("npm", ["--version"], { timeout: 20_000 }).status === 0, record: rec,
+      tools: checkTools(exec, await claudeSet(paseo)), npm: exec("npm", ["--version"], { timeout: 20_000 }).status === 0, record: rec,
       pockets: Object.fromEntries(placed.map((n) => [n, readPocket(ROOT, n)])), plugins, beautifulPockets: readBeautifulPockets(ROOT),
       workspaces: ws.filter((w) => w && !w.archivedAt && w.workspaceId).map((w) => String(w.workspaceId)),
     }) };
