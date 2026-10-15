@@ -11,6 +11,7 @@ import { DrawingView } from "./client/drawing";
 import { WELCOME_KIND, welcomeBody, welcomeRowSchema, welcomeTitle } from "./shared/desk-welcome";
 import { Animated, Easing, Pressable, Text, View } from "react-native";
 import { onPoint, takePoint } from "./shared/pointer";
+import { addHelpButtons } from "./client/help-button";
 
 // No install hook opens a screen, so this item takes the screen over when it first renders (ticket 009): once, while
 // this computer has not seen the welcome. The app's globalThis survives a plugin reload, so a reload does not reopen it.
@@ -97,5 +98,6 @@ export default function contribute(client: PluginClientContext) {
         <Text style={{ color: theme.colors.foreground, fontSize: 15, lineHeight: 22 }}>{welcomeBody(item.data.citizen)}</Text>
       </View>
     ) });
-  return () => {};
+  // Setup must be reachable with the sidebar off (the owner, 2026-10-15): a Setup / Help button on each citizen's workspace.
+  return addHelpButtons(client);
 }

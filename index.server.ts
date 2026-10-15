@@ -7,7 +7,8 @@ import { checkTools, installTools, listExtras } from "./server/tools";
 import { deps, discussDeps, exec, rewardDeps, startSignIn } from "./server/real";
 import { profileDir, signedIn, signedInTo } from "./server/profile";
 import { ask, discuss } from "./server/discuss";
-import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc, tutorialGotItRpc, profileStatusRpc, profileSignInRpc, claudeStatusRpc, claudeSignInRpc, welcomeDismissRpc, welcomeReadRpc, modeSetRpc, askRpc, firstTurnRpc } from "./shared/contracts";
+import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc, tutorialGotItRpc, profileStatusRpc, profileSignInRpc, claudeStatusRpc, claudeSignInRpc, welcomeDismissRpc, welcomeReadRpc, modeSetRpc, askRpc, firstTurnRpc, helpButtonRpc } from "./shared/contracts";
+import { helpButton } from "./shared/help-button";
 import { markWelcomeSeen, welcomeSeen } from "./server/welcome";
 import { gotIt, markSeen, readTutorial, realProbe, stateTicks } from "./server/tutorial";
 import { rewardPass } from "./server/reward";
@@ -60,6 +61,10 @@ export default function contribute(server: PluginServerContext) {
     stateTicks(ROOT, realProbe(ROOT), new Date().toISOString());   // the setup items, from the state as the tutorial opens
     reward(paseo);
     return readTutorial(ROOT);
+  });
+  server.handle(helpButtonRpc, async () => {
+    let rec: unknown = null; try { rec = JSON.parse(fs.readFileSync(path.join(ROOT, "house.json"), "utf8")); } catch { /* no house yet */ }
+    return helpButton(rec, rec ? readTutorial(ROOT).complete : false);
   });
   server.handle(tutorialSeenRpc, async ({ id }) => { markSeen(ROOT, id); return { ok: true }; });
   server.handle(tutorialGotItRpc, async ({ id }) => { gotIt(ROOT, id, new Date().toISOString()); return { ok: true }; });
