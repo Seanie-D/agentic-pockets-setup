@@ -49,3 +49,13 @@ test("a citizen's tutorial record is no part of its pack's hash", () => {
   assert.equal(pieceHash(r, "pack:Ultron"), before);
   fs.rmSync(r, { recursive: true, force: true });
 });
+
+// Item 5 of the next update: a house folder is hashed over the paths its release shipped there (the record's `files`),
+// so the owner's own files in it change nothing. The pin is the Commons pieces.mjs answer for the same tree.
+test("a house folder hashed over its shipped paths leaves the owner's own files out, as the update script does", () => {
+  const r = fs.mkdtempSync(path.join(os.tmpdir(), "pin-"));
+  const w = (f: string, b: string) => { fs.mkdirSync(path.dirname(path.join(r, f)), { recursive: true }); fs.writeFileSync(path.join(r, f), b); };
+  w("Deliverables/README.md", "Shipped.\n"); w("Deliverables/2026-mine.md", "Mine.\n"); w("Deliverables/sub/s.md", "S\n");
+  assert.equal(pieceHash(r, "house:Deliverables", ["README.md", "sub/s.md"]), "48767aa5d48ad1e29e3155984a62d60fcccbf77adb571d180adb7b1271148dd4");
+  assert.equal(pieceHash(r, "house:Deliverables"), "09ae411a635df64405c63fbf94ded81cdc5edb8c8146e17da8b00064d2dc0d6c", "with no list, the whole folder");
+});

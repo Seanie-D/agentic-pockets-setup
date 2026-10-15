@@ -564,6 +564,10 @@ test("the release's house folders, Deliverables and Inbox, are placed and record
   assert.equal(fs.existsSync(path.join(w.root, "docs")), false, "a folder the release names as no piece stays out");
   const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
   assert.equal(rec.release.pieces["house:Deliverables"].placed, pieceHash(w.root, "house:Deliverables"));
+  // Item 5: the paths the release shipped there are kept, so the owner's own files later change nothing.
+  assert.deepEqual(rec.release.pieces["house:Deliverables"].files, ["README.md"]);
+  fs.writeFileSync(path.join(w.root, "Deliverables", "2026-10-15-jarvis-mine.md"), "a deliverable");
+  assert.equal(pieceHash(w.root, "house:Deliverables", rec.release.pieces["house:Deliverables"].files), rec.release.pieces["house:Deliverables"].placed);
 });
 
 // Sean's re-walk, 2026-10-13 16:43 CDT: every citizen still said setup was not finished after it was. The first desk's

@@ -21,13 +21,17 @@ export function pieceRoot(id: string): { dir: string; skip: string[] } {
 }
 
 // sha256 over each file's path inside the piece and its own sha256, in path order; a link counts by its target.
-export function pieceHash(root: string, id: string): string | null {
+// `only`: hash these paths inside the piece and nothing else: a house folder's shipped paths (the record's `files`), so
+// the owner's own files there change nothing (item 5 of the next update; pieces.mjs does the same).
+export function pieceHash(root: string, id: string, only?: string[] | null): string | null {
   const { dir, skip } = pieceRoot(id);
   const top = path.join(root, dir);
   if (!fs.existsSync(top)) return null;
+  const keep = Array.isArray(only) ? new Set(only) : null;
   const lines: string[] = [];
   const walk = (rel: string) => {
     if (skip.includes(rel)) return;
+    if (keep && rel && !keep.has(rel) && ![...keep].some((o) => o.startsWith(`${rel}/`))) return;
     const abs = path.join(top, rel);
     const st = fs.lstatSync(abs);
     if (st.isSymbolicLink()) lines.push(`${rel}\0->${fs.readlinkSync(abs)}`);
@@ -36,4 +40,14 @@ export function pieceHash(root: string, id: string): string | null {
   };
   walk("");
   return crypto.createHash("sha256").update(lines.join("\n")).digest("hex");
+}
+
+// Every file under a folder, as paths inside it: what a release shipped in a house folder.
+export function filesIn(top: string, rel = ""): string[] {
+  const out: string[] = [];
+  for (const e of fs.readdirSync(path.join(top, rel), { withFileTypes: true })) {
+    const r = rel ? `${rel}/${e.name}` : e.name;
+    if (e.isDirectory() && !e.isSymbolicLink()) out.push(...filesIn(top, r)); else out.push(r);
+  }
+  return out.sort();
 }

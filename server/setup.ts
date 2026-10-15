@@ -10,7 +10,7 @@ import { applyExtrasOff, type Extra } from "./tools.ts";
 import { DEFAULT_MODE, tierFor, withTier, type Mode } from "../shared/mode.ts";
 import { CAFE, withOptOut } from "../shared/cafe.ts";
 import { BEAUTIFUL_CHAT, BEAUTIFUL_POCKETS, BUILT } from "../shared/beautiful-pockets.ts";
-import { pieceHash } from "./pieces.ts";
+import { filesIn, pieceHash, pieceRoot } from "./pieces.ts";
 
 const SETUP_ID = "agentic-pockets-setup";   // this plugin's own Paseo id (paseo-plugin.json)
 export interface Exec { (cmd: string, args: string[], o?: { env?: Record<string, string>; cwd?: string; timeout?: number }): { status: number | null; stdout: string; stderr: string } }
@@ -310,15 +310,18 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   // A piece recorded before keeps its record; a release with no RELEASE.json (older ones) records nothing.
   // `release.id` is the release the house was built from, and nothing moves it: an update moves each taken piece's own
   // record, `setupRef`, and `updates.line` (Friday's question on the two-release check, 2026-10-14).
-  let release = rec.release as { id: string; setupRef: string | null; pieces: Record<string, { hash: string; release: string; placed?: string }> } | undefined;
+  let release = rec.release as { id: string; setupRef: string | null; pieces: Record<string, { hash: string; release: string; placed?: string; files?: string[] }> } | undefined;
   let m: { id?: string; number?: string; setup?: { ref?: string }; pieces?: Record<string, { hash: string }> } | null = null;
   try { m = JSON.parse(fs.readFileSync(path.join(upstream, "RELEASE.json"), "utf8")); } catch { /* an older release */ }
   if (m?.pieces && m.id) {
     const pieces = { ...(release?.pieces ?? {}) };
     for (const [id, p] of Object.entries(m.pieces)) {
       if (pieces[id]?.placed) continue;
-      const placed = pieceHash(input.root, id);
-      pieces[id] = { hash: p.hash, release: m.id, ...(placed ? { placed } : {}) };
+      // A house folder keeps the paths the release shipped there, so the owner's own files stay out of its hash (item 5).
+      const shippedDir = path.join(upstream, pieceRoot(id).dir);
+      const files = id.startsWith("house:") && fs.existsSync(shippedDir) && fs.statSync(shippedDir).isDirectory() ? filesIn(shippedDir) : null;
+      const placed = pieceHash(input.root, id, files);
+      pieces[id] = { hash: p.hash, release: m.id, ...(placed ? { placed } : {}), ...(files ? { files } : {}) };
     }
     release = { id: release?.id ?? m.id, setupRef: release?.setupRef ?? m.setup?.ref ?? null, pieces };
   }
