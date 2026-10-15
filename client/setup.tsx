@@ -22,6 +22,22 @@ const NAMES: Record<string, string> = { MissMinutes: "Miss Minutes" };
 const label = (n: string) => NAMES[n] ?? n;
 const ULTRON_LINE = "The Orchestrator, a catch-all agent that can coordinate efforts to your other Pocket Citizens or be your funnel for everything. One-size-fits-all, a more dialed-in Claude type experience that remembers who you are and what you need.";
 
+// The Life map, from the setup screen (the owner on TH5, 2026-10-15: "Agentic Pockets Setup also needs a Life Map button
+// on the header too"). Paseo lets a plugin open only its own pages, so the house plugin, in the same app, leaves its
+// open on globalThis (its client/life-map-button.tsx). Shown only while that is there: a house without it shows nothing.
+const BRIDGE = "__agenticPocketsOpenLifeMap";
+function LifeMapLink({ s }: { s: { quiet: object; quietText: object } }) {
+  const find = () => (globalThis as Record<string, unknown>)[BRIDGE] as (() => void) | undefined;
+  const [open, setOpen] = useState(() => find());
+  useEffect(() => { if (open) return; const t = setInterval(() => { const f = find(); if (f) { setOpen(() => f); clearInterval(t); } }, 2_000); return () => clearInterval(t); }, [open]);
+  if (!open) return null;
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Open the Life map" onPress={() => open()} style={[s.quiet, { alignSelf: "flex-start" }]}>
+      <Text style={s.quietText}>← Life map</Text>
+    </Pressable>
+  );
+}
+
 export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const c = theme.colors;
   const s = useMemo(() => ({
@@ -121,6 +137,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   // the left, and scrolls very far"; a 680-wide body squeezed the page card into a tall strip).
   if (d.setupDone) return (
     <ScrollView style={s.screen}><View style={[s.body, { alignSelf: "center", width: "100%", maxWidth: 1040 }]}>
+      <LifeMapLink s={s} />
       <TutorialView s={s} theme={theme} compact={layout.compact} navigation={navigation} />
     </View></ScrollView>
   );
