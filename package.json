@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/picker.test.ts test/tools.test.ts test/run.test.ts test/install.test.ts test/welcome.test.ts test/tutorial.test.ts test/discuss.test.ts test/reward.test.ts test/profile.test.ts test/winpath.test.ts test/wincmd.test.ts test/hello.test.ts test/claude-path.test.ts test/cafe-optout.test.ts test/pieces.test.ts test/help.test.ts test/mode.test.ts test/form.test.ts test/first-turn.test.ts test/job.test.ts test/paseo-error.test.ts test/workspace.test.ts test/help-button.test.ts test/sign-in-again.test.ts"
+    "test": "node --test test/picker.test.ts test/tools.test.ts test/run.test.ts test/install.test.ts test/welcome.test.ts test/tutorial.test.ts test/discuss.test.ts test/reward.test.ts test/profile.test.ts test/winpath.test.ts test/wincmd.test.ts test/hello.test.ts test/claude-path.test.ts test/cafe-optout.test.ts test/pieces.test.ts test/help.test.ts test/mode.test.ts test/form.test.ts test/first-turn.test.ts test/job.test.ts test/paseo-error.test.ts test/workspace.test.ts test/help-button.test.ts test/sign-in-again.test.ts test/house-status.test.ts"
   },
   "devDependencies": {
     "@getpaseo/plugin": "0.11.2",

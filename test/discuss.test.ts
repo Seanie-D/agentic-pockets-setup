@@ -63,3 +63,18 @@ test("in a house of Jarvis alone, Jarvis leads", async () => {
   const r = await discuss(root, "lifemap", f.deps);
   assert.equal(r.citizen, "Jarvis");
 });
+
+// Item 4b: "Repair my setup" sends Jarvis's desk (else the lead citizen's) one line asking it to run house-check as the
+// owner's request, the way "Discuss this page" reaches a desk, and the screen opens that desk.
+import { repair, repairLine } from "../server/discuss.ts";
+test("Repair my setup reaches Jarvis's desk with the house-check line; a house without Jarvis reaches the lead", async () => {
+  const root = house(["Ultron", "Verro", "Jarvis"]);
+  const f = fake([{ id: "j-desk", cwd: path.join(root, "Pockets", "Jarvis"), labels: { role: "desk" } }, { id: "u-desk", cwd: path.join(root, "Pockets", "Ultron"), labels: { role: "desk" } }]);
+  assert.deepEqual(await repair(root, f.deps), { ok: true, agentId: "j-desk", citizen: "Jarvis", message: "Jarvis has your request to repair the setup." });
+  assert.deepEqual(f.log, [`send j-desk ${repairLine}`]);
+  assert.match(repairLine, /^\[SETUP\] The user pressed "Repair my setup" in Agentic Pockets Setup\. Run the house-check skill/);
+  const noJarvis = house(["Verro"]);
+  const g = fake([]);
+  assert.equal((await repair(noJarvis, g.deps)).citizen, "Verro");
+  assert.deepEqual(g.log, [`open Verro wks_Verro ${repairLine}`]);
+});

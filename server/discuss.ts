@@ -34,8 +34,8 @@ export async function reach(root: string, citizen: string, line: string, deps: D
   return { agentId: await deps.open(row, citizen, line) };
 }
 
-async function toLead(root: string, line: string, what: string, deps: DiscussDeps): Promise<{ ok: boolean; agentId?: string; citizen?: string; message: string }> {
-  const lead = leadOf(root);
+async function toLead(root: string, line: string, what: string, deps: DiscussDeps, to: string | null = leadOf(root)): Promise<{ ok: boolean; agentId?: string; citizen?: string; message: string }> {
+  const lead = to;
   if (!lead) return { ok: false, message: "This house has no citizen to talk to yet. Finish setup first." };
   const r = await reach(root, lead, line, deps);
   if ("error" in r) return { ok: false, message: r.error };
@@ -60,4 +60,12 @@ export function askLine(topic: string): string {
 export async function ask(root: string, topic: string, deps: DiscussDeps): Promise<{ ok: boolean; agentId?: string; citizen?: string; message: string }> {
   if (!Object.hasOwn(TOPICS, topic)) return { ok: false, message: `"${topic}" is not a setup choice.` };
   return toLead(root, askLine(topic), `your question about "${TOPICS[topic].title}"`, deps);
+}
+
+// Item 4b of the next update (the owner, 2026-10-15; shape approved "as is"): "Repair my setup" on the setup page sends
+// Jarvis's desk (else the lead citizen's) one line asking it to run house-check as the owner's request.
+export const repairLine = `[SETUP] The user pressed "Repair my setup" in Agentic Pockets Setup. Run the house-check skill as their request: check each line, show them what you found in plain words, and repair what they say yes to.`;
+export async function repair(root: string, deps: DiscussDeps): Promise<{ ok: boolean; agentId?: string; citizen?: string; message: string }> {
+  const jarvis = fs.existsSync(path.join(root, "Pockets", "Jarvis")) ? "Jarvis" : leadOf(root);
+  return toLead(root, repairLine, "your request to repair the setup", deps, jarvis);
 }

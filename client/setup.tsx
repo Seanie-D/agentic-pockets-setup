@@ -17,6 +17,7 @@ import { PACKS, emptyPick, pickFrom, toggle, view, type Pick } from "../shared/p
 import { openExternal } from "./web";
 import { HELP } from "../shared/help-links";
 import { Hello } from "./hello";
+import { HouseStatus } from "./house-status";
 
 const NAMES: Record<string, string> = { MissMinutes: "Miss Minutes" };
 const label = (n: string) => NAMES[n] ?? n;
@@ -139,6 +140,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
     <ScrollView style={s.screen}><View style={[s.body, { alignSelf: "center", width: "100%", maxWidth: 1040 }]}>
       <LifeMapLink s={s} />
       <TutorialView s={s} theme={theme} compact={layout.compact} navigation={navigation} />
+      <HouseStatus s={s} navigation={navigation} />
     </View></ScrollView>
   );
   if (installed) return (

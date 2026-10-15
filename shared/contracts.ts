@@ -73,3 +73,8 @@ export const helpAskRpc = defineRpc({ name: "setup.help.ask", input: z.object({ 
 // desks use still works, and starts the browser sign-in again (client/sign-in-bridge.ts carries it across).
 export const signInStateRpc = defineRpc({ name: "setup.signin.state", input: z.object({}), output: z.object({ target: z.enum(["house", "own"]).nullable(), signedIn: z.boolean() }) });
 export const signInAgainRpc = defineRpc({ name: "setup.signin.again", input: z.object({}), output: z.object({ started: z.boolean(), message: z.string() }) });
+
+// Item 4b of the next update: after setup ends, the setup page shows house-check's seven lines (server/house-status.ts),
+// and "Repair my setup" sends Jarvis's desk (else the lead's) the house-check request and opens that desk.
+export const houseStatusRpc = defineRpc({ name: "setup.house.status", input: z.object({}), output: z.object({ lines: z.array(z.object({ what: z.string(), ok: z.boolean(), detail: z.string() })) }) });
+export const repairRpc = defineRpc({ name: "setup.repair", input: z.object({}), output: z.object({ ok: z.boolean(), agentId: z.string().optional(), citizen: z.string().optional(), message: z.string() }) });
