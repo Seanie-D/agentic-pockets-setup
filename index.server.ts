@@ -13,7 +13,8 @@ import { markWelcomeSeen, welcomeSeen } from "./server/welcome";
 import { gotIt, markSeen, readTutorial, realProbe, stateTicks } from "./server/tutorial";
 import { rewardPass } from "./server/reward";
 import { askHelp, readGlossary } from "./server/help";
-import { helpAskRpc, helpGlossaryRpc } from "./shared/contracts";
+import { helpAskRpc, helpGlossaryRpc, signInAgainRpc, signInStateRpc } from "./shared/contracts";
+import { signInTarget } from "./shared/sign-in-again";
 import { joinable } from "./shared/job";
 import { clearForm, readForm, saveForm, saveResult } from "./server/form";
 import { firstTurn, type DeskRecord } from "./server/first-turn";
@@ -78,6 +79,15 @@ export default function contribute(server: PluginServerContext) {
   server.handle(profileSignInRpc, async () => startSignIn(profileDir(os.homedir())));
   server.handle(claudeStatusRpc, async () => ({ signedIn: signedInTo(exec, null) }));
   server.handle(claudeSignInRpc, async () => startSignIn(null));
+  // Item 1: the sign-in the house's desks use, read and started again from the house plugin's Citizens page.
+  server.handle(signInStateRpc, async () => {
+    const target = signInTarget(record());
+    return { target, signedIn: target === null ? true : signedInTo(exec, target === "house" ? profileDir(os.homedir()) : null) };
+  });
+  server.handle(signInAgainRpc, async () => {
+    const target = signInTarget(record());
+    return target === null ? { started: false, message: "No citizen in this house runs on Claude." } : startSignIn(target === "house" ? profileDir(os.homedir()) : null);
+  });
   server.handle(modeSetRpc, async ({ mode }) => setMode(ROOT, mode));
   server.handle(askRpc, async ({ topic }, { paseo }) => ask(ROOT, topic, discussDeps(paseo)));
   server.handle(installRpc, async ({ userName, citizens, accounts, extrasOff, cleanProfile, mode, cafe, run }, { paseo }) => {

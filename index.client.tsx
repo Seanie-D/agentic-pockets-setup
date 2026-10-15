@@ -12,6 +12,7 @@ import { WELCOME_KIND, welcomeBody, welcomeRowSchema, welcomeTitle } from "./sha
 import { Animated, Easing, Pressable, Text, View } from "react-native";
 import { onPoint, takePoint } from "./shared/pointer";
 import { addHelpButtons } from "./client/help-button";
+import { addSignInBridge } from "./client/sign-in-bridge";
 
 // No install hook opens a screen, so this item takes the screen over when it first renders (ticket 009): once, while
 // this computer has not seen the welcome. The app's globalThis survives a plugin reload, so a reload does not reopen it.
@@ -99,5 +100,7 @@ export default function contribute(client: PluginClientContext) {
       </View>
     ) });
   // Setup must be reachable with the sidebar off (the owner, 2026-10-15): a Setup / Help button on each citizen's workspace.
-  return addHelpButtons(client);
+  const removeHelp = addHelpButtons(client);
+  const removeBridge = addSignInBridge(client);
+  return () => { removeBridge(); return removeHelp(); };
 }

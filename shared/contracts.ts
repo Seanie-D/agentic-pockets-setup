@@ -68,3 +68,8 @@ export const helpGlossaryRpc = defineRpc({ name: "setup.help.glossary", input: z
   output: z.object({ terms: z.array(z.object({ word: z.string(), meaning: z.string(), not: z.string().optional() })) }) });
 export const helpAskRpc = defineRpc({ name: "setup.help.ask", input: z.object({ kind: z.enum(["term", "page"]), id: z.string() }),
   output: z.object({ ok: z.boolean(), agentId: z.string().optional(), citizen: z.string().optional(), message: z.string() }) });
+
+// Item 1 of the next update: after setup, the house plugin's Citizens page asks whether the Claude sign-in the house's
+// desks use still works, and starts the browser sign-in again (client/sign-in-bridge.ts carries it across).
+export const signInStateRpc = defineRpc({ name: "setup.signin.state", input: z.object({}), output: z.object({ target: z.enum(["house", "own"]).nullable(), signedIn: z.boolean() }) });
+export const signInAgainRpc = defineRpc({ name: "setup.signin.again", input: z.object({}), output: z.object({ started: z.boolean(), message: z.string() }) });
