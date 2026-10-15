@@ -529,6 +529,24 @@ test("the house record names its base release, and each piece's hash as released
 
 // Sean's re-walk, 2026-10-13 16:43 CDT: the house folders of a release (Deliverables, Inbox) were never placed, so the
 // update system read them as new in every house. Setup places them like the Commons; a folder the user has is kept.
+// Item 4 of the next update: a new house knows its own number from the start, as the update ledger writes it
+// (house-update update.mjs: updates.line), not only after its first update.
+test("a new house records the release's number as its line; a second run keeps a line already there", async () => {
+  const release = { format: 1, id: "r11", number: "1.1", setup: { ref: "abc1234" }, pieces: { core: { hash: "h-core", depends: [] } } };
+  const w = world({ release });
+  const input = { code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home };
+  assert.equal((await runSetup(input, w.deps)).ok, true);
+  const file = path.join(w.root, "house.json");
+  assert.equal(JSON.parse(fs.readFileSync(file, "utf8")).updates.line, "1.1");
+  const rec = JSON.parse(fs.readFileSync(file, "utf8"));
+  fs.writeFileSync(file, JSON.stringify({ ...rec, updates: { ...rec.updates, line: "1.2a" } }));
+  assert.equal((await runSetup(input, w.deps)).ok, true);
+  assert.equal(JSON.parse(fs.readFileSync(file, "utf8")).updates.line, "1.2a", "an update's line is never set back");
+  const old = world({ release: { ...release, number: undefined } });
+  await runSetup({ ...input, root: old.root, home: old.home }, old.deps);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(old.root, "house.json"), "utf8")).updates.line, "r11", "a release with no number gives its id, as the ledger does");
+});
+
 test("the release's house folders, Deliverables and Inbox, are placed and recorded as placed; a folder the user has is kept", async () => {
   const release = { format: 1, id: "r1base", pieces: { "house:Deliverables": { hash: "h-del", depends: [] }, "house:Inbox": { hash: "h-in", depends: [] } } };
   const w = world({ release });

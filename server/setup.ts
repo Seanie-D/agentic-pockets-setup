@@ -311,7 +311,7 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   // `release.id` is the release the house was built from, and nothing moves it: an update moves each taken piece's own
   // record, `setupRef`, and `updates.line` (Friday's question on the two-release check, 2026-10-14).
   let release = rec.release as { id: string; setupRef: string | null; pieces: Record<string, { hash: string; release: string; placed?: string }> } | undefined;
-  let m: { id?: string; setup?: { ref?: string }; pieces?: Record<string, { hash: string }> } | null = null;
+  let m: { id?: string; number?: string; setup?: { ref?: string }; pieces?: Record<string, { hash: string }> } | null = null;
   try { m = JSON.parse(fs.readFileSync(path.join(upstream, "RELEASE.json"), "utf8")); } catch { /* an older release */ }
   if (m?.pieces && m.id) {
     const pieces = { ...(release?.pieces ?? {}) };
@@ -322,6 +322,10 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
     }
     release = { id: release?.id ?? m.id, setupRef: release?.setupRef ?? m.setup?.ref ?? null, pieces };
   }
-  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off, extrasSettings: extrasSettingsOut } : {}), seasonSettings: sz.settings, desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, placedCitizens, mode, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, ...(release ? { release } : {}), createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
+  // Item 4: the house's number from the start (the release's number, else its id, as the update ledger writes it). A line
+  // already there came from an update, and is never set back.
+  const prior = rec.updates as { line?: string } | undefined;
+  const updates = prior?.line || !m?.id ? prior : { ...(prior ?? {}), line: m.number ?? m.id };
+  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off, extrasSettings: extrasSettingsOut } : {}), seasonSettings: sz.settings, desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, placedCitizens, mode, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, ...(release ? { release } : {}), ...(updates ? { updates } : {}), createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
   return { ok: true, message: `${first} is ready. Finish setup here, then say hello.`, steps, firstDesk: { citizen: first, agentId: desk.agentId } };
 }
