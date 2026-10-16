@@ -288,11 +288,11 @@ test("an old npm copy runs first and a newer copy is here: Paseo is told to use 
   assert.ok(!calls.some((c) => /^(sh|npm|sudo)\b/.test(c) || /^brew (install|upgrade)/.test(c) || c.endsWith(" update")), calls.join("\n"));
 });
 
-// Nick's real case: Anthropic's own install ran first at 2.1.220; Homebrew's 2.1.300 came after
+// A real case: Anthropic's own install ran first at 2.1.220; Homebrew's 2.1.300 came after
 // it. With item 7a the newer Homebrew copy is used as it is: no update is run.
 test("an old copy of Anthropic's own runs first and Homebrew's is newer: Paseo uses Homebrew's; nothing is updated", () => {
-  const LOCAL = "/Users/nickloux/.local/bin/claude", BREW = "/opt/homebrew/bin/claude";
-  const real: Record<string, string> = { [LOCAL]: "/Users/nickloux/.local/share/claude/versions/2.1.220", [BREW]: "/opt/homebrew/Caskroom/claude-code/2.1.300/claude" };
+  const LOCAL = "/Users/nick/.local/bin/claude", BREW = "/opt/homebrew/bin/claude";
+  const real: Record<string, string> = { [LOCAL]: "/Users/nick/.local/share/claude/versions/2.1.220", [BREW]: "/opt/homebrew/Caskroom/claude-code/2.1.300/claude" };
   const VER: Record<string, string> = { claude: "2.1.220", [LOCAL]: "2.1.220", [BREW]: "2.1.300", node: "24.16.0", git: "2.43.0", paseo: "0.11.2", brew: "4.0.0" };
   const calls: string[] = [];
   const run = (cmd: string, args: string[]) => {
@@ -308,7 +308,7 @@ test("an old copy of Anthropic's own runs first and Homebrew's is newer: Paseo u
 
 // With no copy new enough, the copy that runs first is updated by its own route: Anthropic's copy by itself.
 test("only an old copy of Anthropic's own: it updates itself, and nothing else is installed", () => {
-  const LOCAL = "/Users/nickloux/.local/bin/claude";
+  const LOCAL = "/Users/nick/.local/bin/claude";
   const VER: Record<string, string> = { claude: "2.1.220", [LOCAL]: "2.1.220", node: "24.16.0", git: "2.43.0", paseo: "0.11.2" };
   const calls: string[] = [];
   const run = (cmd: string, args: string[]) => {
@@ -318,7 +318,7 @@ test("only an old copy of Anthropic's own: it updates itself, and nothing else i
     if (cmd === LOCAL && args[0] === "update") { VER[LOCAL] = VER.claude = "2.1.300"; return { status: 0, stdout: "Successfully updated\n" }; }
     return { status: 1, stdout: "" };
   };
-  const r = installTools(run, "darwin", () => true, () => "/Users/nickloux/.local/share/claude/versions/2.1.220").find((t) => t.name === "claude")!;
+  const r = installTools(run, "darwin", () => true, () => "/Users/nick/.local/share/claude/versions/2.1.220").find((t) => t.name === "claude")!;
   assert.ok(calls.includes(`${LOCAL} update`), calls.join("\n"));
   assert.deepEqual([r.state, r.action, r.have, r.pin], ["ok", "updated", "2.1.300", undefined]);
   assert.ok(!calls.some((c) => c.startsWith("sh ") || /^brew (install|upgrade)/.test(c)), "no other install");
