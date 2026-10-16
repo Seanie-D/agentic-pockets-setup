@@ -1,12 +1,15 @@
-// Item 4b of the next update (the owner, Ultron's desk, 2026-10-15 15:45 CDT; the shape approved at 16:18 CDT): after
-// setup ends, the setup page shows whether setup finished every step, as the house-check skill's seven lines
-// (Commons/skills/records/house-check/SKILL.md), each with a tick or what is missing. This decides from what was read;
-// readHouseStatus below reads it. Kept free of Paseo so its tests run in plain Node.
+// Item 4b of the next update: after setup ends, the setup page shows whether setup finished every step, as the
+// house-check skill's seven lines (Commons/skills/records/house-check/SKILL.md), each with a tick or what is missing.
+// houseStatus decides from what was read; readHouseInputs below reads it, with the Paseo handle passed in.
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { BEAUTIFUL_CHAT, BEAUTIFUL_POCKETS, BUILT } from "../shared/beautiful-pockets.ts";
+import { checkTools } from "./tools.ts";
+import type { Exec } from "./setup.ts";   // a type only, so no import cycle at run time
 
-export interface StatusLine { what: string; ok: boolean; detail: string }
+// unknown: the line could not be checked (its source could not be read), so it is neither a tick nor a fault.
+export interface StatusLine { what: string; ok: boolean; detail: string; unknown?: true }
 export interface PocketFacts { contract: boolean; version: boolean; settings: boolean; hook: boolean; tier: string | null }
 export interface StatusInput {
   tools: { name: string; state: "ok" | "old" | "missing"; have: string | null }[];
@@ -15,7 +18,7 @@ export interface StatusInput {
   pockets: Record<string, PocketFacts>;
   plugins: { id: string; running: boolean | null }[];   // running null: Paseo could not say
   beautifulPockets: { folder: boolean; built: boolean };
-  workspaces: string[];                                 // the live workspace ids Paseo has
+  workspaces: string[] | null;                          // the live workspace ids Paseo has; null: its list could not be read
 }
 
 const NEED_CLAUDE = "2.1.280";
@@ -33,7 +36,7 @@ export function houseStatus(i: StatusInput): StatusLine[] {
   // 1. Claude Code: the copy that runs first is new enough (the check runs `claude`, so it is the first one).
   const claude = tool("claude");
   out.push(line("Claude Code", !claude || claude.state === "missing" ? ["Claude Code does not answer."]
-    : claude.state === "old" ? [`Claude Code ${claude.have} runs first; ${NEED_CLAUDE} or newer is needed.`] : [], `Claude Code ${claude?.have ?? ""} runs first.`.replace("  ", " ")));
+    : claude.state === "old" ? [`Claude Code ${claude.have} runs first; ${NEED_CLAUDE} or newer is needed.`] : [], claude?.have ? `Claude Code ${claude.have} runs first.` : "Claude Code runs."));
 
   // 2. Node, npm and Paseo.
   const node = tool("node"), paseo = tool("paseo");
@@ -44,8 +47,9 @@ export function houseStatus(i: StatusInput): StatusLine[] {
   ]));
 
   // 3. The house record.
-  const missingKeys = [["userName", rec.userName], ["release", rec.release?.id], ["citizens", rec.citizens], ["placedCitizens", rec.placedCitizens], ["mode", rec.mode]]
-    .filter(([, v]) => v === undefined || v === null || v === "").map(([k]) => k as string);
+  // The keys house-check's line 3 names, one list, so the two cannot drift.
+  const REQUIRED: [string, unknown][] = [["userName", rec.userName], ["release.id", rec.release?.id], ["release.setupRef", rec.release?.setupRef], ["citizens", rec.citizens], ["placedCitizens", rec.placedCitizens], ["mode", rec.mode]];
+  const missingKeys = REQUIRED.filter(([, v]) => v === undefined || v === null || v === "").map(([k]) => k);
   out.push(line("The house record", i.record === null ? ["house.json cannot be read."] : [
     ...(rec.setupDone === true ? [] : ["Setup is not marked finished."]),
     ...(missingKeys.length ? [`It lacks ${missingKeys.join(", ")}.`] : []),
@@ -76,8 +80,9 @@ export function houseStatus(i: StatusInput): StatusLine[] {
   if (plug(BEAUTIFUL_CHAT) && !plug(BEAUTIFUL_POCKETS)) out.push({ what: "Beautiful Pockets built", ok: true, detail: "Not needed: this Paseo keeps Beautiful Chat." });
   else out.push(line("Beautiful Pockets built", !i.beautifulPockets.folder ? ["Its folder, plugins/beautiful-pockets, is missing."] : i.beautifulPockets.built ? [] : ["Its build did not finish."]));
 
-  // 7. The workspaces: each desk row's workspace is still in Paseo.
-  out.push(line("The workspaces", placed.filter((n) => desks[n]?.workspaceId && !i.workspaces.includes(String(desks[n].workspaceId))).map((n) => `${show(n)}'s workspace is missing.`)));
+  // 7. The workspaces: each desk row's workspace is still in Paseo. A list that cannot be read is not checked.
+  if (i.workspaces === null) out.push({ what: "The workspaces", ok: true, unknown: true, detail: "Not checked: Paseo's list of workspaces could not be read." });
+  else { const live = i.workspaces; out.push(line("The workspaces", placed.filter((n) => desks[n]?.workspaceId && !live.includes(String(desks[n].workspaceId))).map((n) => `${show(n)}'s workspace is missing.`))); }
   return out;
 }
 
@@ -92,4 +97,25 @@ export function readPocket(root: string, name: string): PocketFacts {
 export function readBeautifulPockets(root: string) {
   const dir = path.join(root, "plugins", BEAUTIFUL_POCKETS);
   return { folder: fs.existsSync(dir), built: fs.existsSync(path.join(dir, "node_modules", BUILT)) };
+}
+
+// Everything houseStatus reads: the tools (the Claude copy Paseo is set to, claudeAt), npm, house.json, each placed pocket,
+// Paseo's plugins (its own list says which run; when its command cannot be asked, its settings say which are there,
+// configPlugins), Beautiful Pockets' folder, and Paseo's record of its workspaces.
+export async function readHouseInputs(root: string, exec: Exec, claudeAt: string | null, configPlugins: () => Promise<string[]>): Promise<StatusInput> {
+  let record: Record<string, unknown> | null = null;
+  try { record = JSON.parse(fs.readFileSync(path.join(root, "house.json"), "utf8")); } catch { /* unreadable: line 3 says so */ }
+  const placed = Array.isArray(record?.placedCitizens) ? (record!.placedCitizens as string[]) : [];
+  let plugins: StatusInput["plugins"];
+  const ls = exec("paseo", ["plugin", "ls", "--json"], { timeout: 20_000 });
+  try { plugins = (JSON.parse(ls.stdout.slice(ls.stdout.search(/[[{]/))) as { id?: string; name?: string; status?: string }[]).map((p) => ({ id: String(p.id ?? p.name), running: p.status ? p.status === "running" : null })); }
+  catch { plugins = (await configPlugins().catch(() => [] as string[])).map((id) => ({ id, running: null })); }
+  let workspaces: string[] | null = null;
+  try {
+    const w = JSON.parse(fs.readFileSync(path.join(process.env.PASEO_HOME || path.join(os.homedir(), ".paseo"), "projects", "workspaces.json"), "utf8"));
+    const all = (Array.isArray(w) ? w : Object.values(w.workspaces ?? w)) as { workspaceId?: string; archivedAt?: string | null }[];
+    workspaces = all.filter((x) => x && !x.archivedAt && x.workspaceId).map((x) => String(x.workspaceId));
+  } catch { /* unreadable: line 7 is not checked */ }
+  return { tools: checkTools(exec, claudeAt), npm: exec("npm", ["--version"], { timeout: 20_000 }).status === 0, record,
+    pockets: Object.fromEntries(placed.map((n) => [n, readPocket(root, n)])), plugins, beautifulPockets: readBeautifulPockets(root), workspaces };
 }

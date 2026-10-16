@@ -269,7 +269,7 @@ test("a Claude Code too old for the release's models is old, so setup offers the
 
 // Nick's setup on 1.0.1, 2026-10-14 15:52 CDT: Claude Code 2.1.220 read too old, Install ran, and the check said
 // "claude is still too old after the install": the installer's new copy went to ~/.local/bin, and an old npm copy in
-// /usr/local/bin still ran first. Item 7a (the owner, 2026-10-15 16:15 CDT): setup now tells Paseo to use the newer copy
+// /usr/local/bin still ran first. Item 7a: setup now tells Paseo to use the newer copy
 // at once, and installs, updates and removes nothing.
 test("an old npm copy runs first and a newer copy is here: Paseo is told to use the newer one; nothing is installed or removed", () => {
   const OLD = "/usr/local/bin/claude", NEW = "/Users/nick/.local/bin/claude";

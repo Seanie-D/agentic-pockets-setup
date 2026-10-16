@@ -76,5 +76,5 @@ export const signInAgainRpc = defineRpc({ name: "setup.signin.again", input: z.o
 
 // Item 4b of the next update: after setup ends, the setup page shows house-check's seven lines (server/house-status.ts),
 // and "Repair my setup" sends Jarvis's desk (else the lead's) the house-check request and opens that desk.
-export const houseStatusRpc = defineRpc({ name: "setup.house.status", input: z.object({}), output: z.object({ lines: z.array(z.object({ what: z.string(), ok: z.boolean(), detail: z.string() })) }) });
+export const houseStatusRpc = defineRpc({ name: "setup.house.status", input: z.object({}), output: z.object({ lines: z.array(z.object({ what: z.string(), ok: z.boolean(), detail: z.string(), unknown: z.boolean().optional() })) }) });
 export const repairRpc = defineRpc({ name: "setup.repair", input: z.object({}), output: z.object({ ok: z.boolean(), agentId: z.string().optional(), citizen: z.string().optional(), message: z.string() }) });

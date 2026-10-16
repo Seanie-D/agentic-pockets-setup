@@ -39,8 +39,7 @@ test("on Windows the PATH goes under the name the system uses, and a folder alre
   assert.equal(pinNode({ claude: { env: { path: "C:\\mine" } } }, ["claude"], "C:\\Program Files\\nodejs", "C:\\Windows", ";", "Path"), null);
 });
 
-// Item 7a of the next update (the owner, Ultron's desk, 2026-10-15 16:15 CDT: "our tool to make sure it can adapt to any
-// possible weird which-way that someone has their Claude Code installed"): each copy's origin, from where its command
+// Item 7a of the next update: setup adapts to any way Claude Code is installed. Each copy's origin, from where its command
 // really lives; the newest copy new enough is picked; Paseo is told to use it when the copy it would run is not good.
 import { originOf, pickClaude, choosePin, updateRoute } from "../shared/claude-path.ts";
 test("each copy's origin is read from where it really lives", () => {
@@ -83,4 +82,14 @@ test("each origin's own update route; an app, or a copy from nowhere known, has 
   assert.deepEqual(updateRoute({ at: "C:\\x\\claude.exe", version: "1", from: "winget" }, "win32"), ["winget", "upgrade", "--id", "Anthropic.ClaudeCode", "--exact", "--silent", "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"]);
   assert.equal(updateRoute({ at: "/Applications/Claude Code.app/Contents/MacOS/claude", version: "1", from: "an app" }, "darwin"), null);
   assert.equal(updateRoute({ at: "/usr/bin/claude", version: "1", from: null }, "linux"), null);
+});
+
+// Windows (the setup review, round 1): `where claude` gives npm's .cmd shim, whose real path is itself.
+test("on Windows the npm shim, nvm-windows and Volta are known too, and the shim updates with npm on the PATH", () => {
+  assert.equal(originOf("C:\\Users\\n\\AppData\\Roaming\\npm\\claude.cmd"), "npm");
+  assert.equal(originOf("C:\\Users\\n\\AppData\\Roaming\\npm\\claude"), "npm");
+  assert.equal(originOf("C:\\Users\\n\\AppData\\Roaming\\nvm\\v20.11.0\\claude.cmd"), "npm under nvm");
+  assert.equal(originOf("C:\\Users\\n\\AppData\\Local\\Volta\\bin\\claude.exe"), "Volta");
+  assert.deepEqual(updateRoute({ at: "C:\\Users\\n\\AppData\\Roaming\\npm\\claude.cmd", version: "1", from: "npm" }, "win32"), ["npm", "install", "-g", "@anthropic-ai/claude-code@latest"]);
+  assert.deepEqual(updateRoute({ at: "C:\\Users\\n\\AppData\\Roaming\\nvm\\v20.11.0\\claude.cmd", version: "1", from: "npm under nvm" }, "win32"), ["C:\\Users\\n\\AppData\\Roaming\\nvm\\v20.11.0\\npm.cmd", "install", "-g", "@anthropic-ai/claude-code@latest"]);
 });

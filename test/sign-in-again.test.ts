@@ -1,4 +1,4 @@
-// Item 1 of the next update (the owner, 2026-10-14 10:03 CDT, "Yeah that works"): after setup, when a Claude sign-in runs
+// Item 1 of the next update: after setup, when a Claude sign-in runs
 // out, the house plugin's Citizens page says so and offers Sign in again. Setup holds the sign-in; this names which one.
 //   node --test test/sign-in-again.test.ts
 import { test } from "node:test";

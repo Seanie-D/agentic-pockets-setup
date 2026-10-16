@@ -14,7 +14,7 @@ import { gotIt, markSeen, readTutorial, realProbe, stateTicks } from "./server/t
 import { rewardPass } from "./server/reward";
 import { askHelp, readGlossary } from "./server/help";
 import { helpAskRpc, helpGlossaryRpc, signInAgainRpc, signInStateRpc, houseStatusRpc, repairRpc } from "./shared/contracts";
-import { houseStatus, readBeautifulPockets, readPocket } from "./server/house-status";
+import { houseStatus, readHouseInputs } from "./server/house-status";
 import { repair } from "./server/discuss";
 import { signInTarget } from "./shared/sign-in-again";
 import { joinable } from "./shared/job";
@@ -89,22 +89,8 @@ export default function contribute(server: PluginServerContext) {
   server.handle(claudeStatusRpc, async () => ({ signedIn: signedInTo(exec, null) }));
   server.handle(claudeSignInRpc, async () => startSignIn(null));
   // Item 4b: house-check's seven lines, read on the setup page after setup ends, and its Repair my setup.
-  server.handle(houseStatusRpc, async (_i, { paseo }) => {
-    const rec = (() => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, "house.json"), "utf8")); } catch { return null; } })();
-    const placed: string[] = Array.isArray(rec?.placedCitizens) ? rec.placedCitizens : [];
-    // Paseo's own plugin list says which run; when its command cannot be asked, its settings say which are there.
-    let plugins: { id: string; running: boolean | null }[] = [];
-    const ls = exec("paseo", ["plugin", "ls", "--json"], { timeout: 20_000 });
-    try { plugins = (JSON.parse(ls.stdout.slice(ls.stdout.search(/[[{]/))) as { id?: string; name?: string; status?: string }[]).map((p) => ({ id: String(p.id ?? p.name), running: p.status ? p.status === "running" : null })); }
-    catch { plugins = await paseo.config.get().then(({ config }) => Object.keys((config as { plugins?: Record<string, unknown> }).plugins ?? {}).map((id) => ({ id, running: null }))).catch(() => []); }
-    let ws: { workspaceId?: string; archivedAt?: string | null }[] = [];
-    try { const w = JSON.parse(fs.readFileSync(path.join(process.env.PASEO_HOME || path.join(os.homedir(), ".paseo"), "projects", "workspaces.json"), "utf8")); ws = Array.isArray(w) ? w : Object.values(w.workspaces ?? w); } catch { /* none readable */ }
-    return { lines: houseStatus({
-      tools: checkTools(exec, await claudeSet(paseo)), npm: exec("npm", ["--version"], { timeout: 20_000 }).status === 0, record: rec,
-      pockets: Object.fromEntries(placed.map((n) => [n, readPocket(ROOT, n)])), plugins, beautifulPockets: readBeautifulPockets(ROOT),
-      workspaces: ws.filter((w) => w && !w.archivedAt && w.workspaceId).map((w) => String(w.workspaceId)),
-    }) };
-  });
+  server.handle(houseStatusRpc, async (_i, { paseo }) => ({ lines: houseStatus(await readHouseInputs(ROOT, exec, await claudeSet(paseo),
+    () => paseo.config.get().then(({ config }) => Object.keys((config as { plugins?: Record<string, unknown> }).plugins ?? {})))) }));
   server.handle(repairRpc, async (_i, { paseo }) => repair(ROOT, discussDeps(paseo)));
   // Item 1: the sign-in the house's desks use, read and started again from the house plugin's Citizens page.
   server.handle(signInStateRpc, async () => {

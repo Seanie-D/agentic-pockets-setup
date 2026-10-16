@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Pressable, Text, View } from "react-native";
 import { houseStatusRpc, repairRpc } from "../shared/contracts";
 
-// Item 4b of the next update (the owner, Ultron's desk, 2026-10-15 15:45 CDT; shape approved 16:18 CDT): below the
+// Item 4b of the next update: below the
 // steps, once setup has ended, the setup status (house-check's seven lines, each a tick or what is missing) and the
 // Repair my setup button, which sends Jarvis's desk the house-check request and opens that desk.
 type S = { h2: object; p: object; muted: object; good: object; bad: object; card: object; row: object; button: object; buttonText: object; quiet: object; quietText: object; locked: object };
@@ -22,7 +22,7 @@ export function HouseStatus({ s, navigation }: { s: S; navigation: PluginScreenP
       {q.isError ? <Text style={s.bad}>The check could not run: {String(q.error)}</Text> : null}
       {lines.map((l) => (
         <View key={l.what} style={{ flexDirection: "row", gap: 8 }}>
-          <Text style={l.ok ? s.good : s.bad}>{l.ok ? "✓" : "✗"}</Text>
+          <Text style={l.unknown ? s.muted : l.ok ? s.good : s.bad}>{l.unknown ? "?" : l.ok ? "✓" : "✗"}</Text>
           <Text style={[s.p, { flexShrink: 1 }]}><Text style={{ fontWeight: "600" }}>{l.what}.</Text> {l.detail}</Text>
         </View>
       ))}

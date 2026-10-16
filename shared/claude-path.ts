@@ -35,9 +35,8 @@ export function pinNode(providers: Providers, ids: string[], nodeDir: string | n
   return changed ? out : null;
 }
 
-// Item 7a of the next update (the owner, Ultron's desk, 2026-10-15 16:15 CDT: "adapt to any possible weird which-way that
-// someone has their Claude Code installed"). Setup finds every copy in Paseo's own PATH order, knows where each came
-// from, picks the newest one new enough, and tells Paseo to use it, so nobody removes or updates anything by hand. An old
+// Item 7a of the next update: setup adapts to any way Claude Code is installed. It finds every copy in Paseo's own PATH
+// order, knows where each came from, picks the newest one new enough, and tells Paseo to use it, so nobody removes or updates anything by hand. An old
 // copy is updated only by its own route.
 export type Origin = "Anthropic's installer" | "Homebrew" | "npm" | "npm under nvm" | "Volta" | "winget" | "an app";
 export interface ClaudeCopy { at: string; version: string | null; from: Origin | null }
@@ -45,8 +44,11 @@ export interface ClaudeCopy { at: string; version: string | null; from: Origin |
 // Where a copy came from, read from where its command really lives (its link followed).
 export function originOf(real: string): Origin | null {
   const p = real.replace(/\\/g, "/");
-  if (/\/\.volta\//.test(p)) return "Volta";
+  if (/\/\.?volta\//i.test(p)) return "Volta";
   if (/node_modules\/@anthropic-ai\/claude-code/.test(p)) return /\/\.nvm\//.test(p) ? "npm under nvm" : "npm";
+  // Windows: npm's global shim (its real path is itself), and nvm-windows' version folders.
+  if (/\/AppData\/Roaming\/nvm\/[^/]+\/claude(\.cmd|\.ps1)?$/i.test(p)) return "npm under nvm";
+  if (/\/AppData\/Roaming\/npm\/claude(\.cmd|\.ps1)?$/i.test(p)) return "npm";
   if (/\/(Caskroom|Cellar)\//.test(p)) return "Homebrew";
   if (/\/\.local\/share\/claude\//.test(p) || /\/\.local\/bin\/claude\.exe$/i.test(p)) return "Anthropic's installer";
   if (/\/WinGet\/(Packages|Links)\//i.test(p)) return "winget";
@@ -86,7 +88,10 @@ export function updateRoute(c: ClaudeCopy, platform: string): string[] | null {
   switch (c.from) {
     case "Anthropic's installer": return [c.at, "update"];
     case "Homebrew": return ["brew", "upgrade", "--cask", "claude-code"];
-    case "npm": case "npm under nvm": return [`${dir}${sep}npm${platform === "win32" ? ".cmd" : ""}`, "install", "-g", "@anthropic-ai/claude-code@latest"];
+    // npm's own Windows shim folder holds no npm: the npm on the PATH is the one that put it there.
+    case "npm": if (platform === "win32" && /[\\/]AppData[\\/]Roaming[\\/]npm$/i.test(dir)) return ["npm", "install", "-g", "@anthropic-ai/claude-code@latest"];
+    // falls through: elsewhere the npm beside the copy is its own
+    case "npm under nvm": return [`${dir}${sep}npm${platform === "win32" ? ".cmd" : ""}`, "install", "-g", "@anthropic-ai/claude-code@latest"];
     case "Volta": return ["volta", "install", "@anthropic-ai/claude-code@latest"];
     case "winget": return ["winget", "upgrade", "--id", "Anthropic.ClaudeCode", "--exact", "--silent", "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"];
     default: return null;

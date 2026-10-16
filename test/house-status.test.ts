@@ -1,4 +1,4 @@
-// Item 4b of the next update (the owner, Ultron's desk, 2026-10-15 15:45 CDT; shape approved 16:18 CDT, "Approve as is"):
+// Item 4b of the next update:
 // after setup ends, the setup page shows house-check's seven lines, each with a tick or what is missing.
 //   node --test test/house-status.test.ts
 import { test } from "node:test";
@@ -49,4 +49,14 @@ test("Beautiful Chat in Beautiful Pockets' place is fine, and then the build lin
   const by = Object.fromEntries(houseStatus(i).map((l) => [l.what, l]));
   assert.equal(by["Paseo's plugins"].ok, true);
   assert.deepEqual([by["Beautiful Pockets built"].ok, by["Beautiful Pockets built"].detail], [true, "Not needed: this Paseo keeps Beautiful Chat."]);
+});
+
+test("a record without release.setupRef lacks it; a workspace list that cannot be read is not checked, not a fault", () => {
+  const i = good();
+  i.record = { ...i.record, release: { id: "r1" } };
+  i.workspaces = null;
+  const by = Object.fromEntries(houseStatus(i).map((l) => [l.what, l]));
+  assert.deepEqual([by["The house record"].ok, by["The house record"].detail], [false, "It lacks release.setupRef."]);
+  assert.deepEqual([by["The workspaces"].ok, by["The workspaces"].unknown, by["The workspaces"].detail], [true, true, "Not checked: Paseo's list of workspaces could not be read."]);
+  assert.equal(by["Claude Code"].detail, "Claude Code 2.1.290 runs first.");
 });
