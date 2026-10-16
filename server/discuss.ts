@@ -62,8 +62,8 @@ export async function ask(root: string, topic: string, deps: DiscussDeps): Promi
   return toLead(root, askLine(topic), `your question about "${TOPICS[topic].title}"`, deps);
 }
 
-// Item 4b of the next update: "Repair my setup" on the setup page sends
-// Jarvis's desk (else the lead citizen's) one line asking it to run house-check as the owner's request.
+// Item 4b of the next update: "Repair my setup" on the setup page sends Jarvis's desk (else the lead citizen's) one line
+// asking it to run house-check as the owner's request.
 export const repairLine = `[SETUP] The user pressed "Repair my setup" in Agentic Pockets Setup. Run the house-check skill as their request: check each line, show them what you found in plain words, and repair what they say yes to.`;
 export async function repair(root: string, deps: DiscussDeps): Promise<{ ok: boolean; agentId?: string; citizen?: string; message: string }> {
   const jarvis = fs.existsSync(path.join(root, "Pockets", "Jarvis")) ? "Jarvis" : leadOf(root);

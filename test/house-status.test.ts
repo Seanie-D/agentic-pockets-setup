@@ -60,3 +60,11 @@ test("a record without release.setupRef lacks it; a workspace list that cannot b
   assert.deepEqual([by["The workspaces"].ok, by["The workspaces"].unknown, by["The workspaces"].detail], [true, true, "Not checked: Paseo's list of workspaces could not be read."]);
   assert.equal(by["Claude Code"].detail, "Claude Code 2.1.290 runs first.");
 });
+
+test("a plugin list that cannot be read is not checked, not three faults", () => {
+  const i = good();
+  i.plugins = null;
+  const by = Object.fromEntries(houseStatus(i).map((l) => [l.what, l]));
+  assert.deepEqual([by["Paseo's plugins"].ok, by["Paseo's plugins"].unknown, by["Paseo's plugins"].detail], [true, true, "Not checked: Paseo's list of plugins could not be read."]);
+  assert.equal(by["Beautiful Pockets built"].ok, true, "the build line still reads the folder");
+});

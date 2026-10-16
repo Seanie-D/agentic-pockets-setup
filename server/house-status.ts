@@ -16,7 +16,7 @@ export interface StatusInput {
   npm: boolean;
   record: Record<string, unknown> | null;
   pockets: Record<string, PocketFacts>;
-  plugins: { id: string; running: boolean | null }[];   // running null: Paseo could not say
+  plugins: { id: string; running: boolean | null }[] | null;   // running null: Paseo could not say; null: no list at all
   beautifulPockets: { folder: boolean; built: boolean };
   workspaces: string[] | null;                          // the live workspace ids Paseo has; null: its list could not be read
 }
@@ -68,16 +68,17 @@ export function houseStatus(i: StatusInput): StatusLine[] {
   out.push(line("Each citizen's pocket", pocketProblems));
 
   // 5. Paseo's plugins: the house plugin running, setup present, and one chat look (Beautiful Chat counts in its place).
-  const plug = (id: string) => i.plugins.find((p) => p.id === id);
+  const plug = (id: string) => i.plugins?.find((p) => p.id === id);
   const chat = plug(BEAUTIFUL_POCKETS) ?? plug(BEAUTIFUL_CHAT);
-  out.push(line("Paseo's plugins", [
+  if (i.plugins === null) out.push({ what: "Paseo's plugins", ok: true, unknown: true, detail: "Not checked: Paseo's list of plugins could not be read." });
+  else out.push(line("Paseo's plugins", [
     ...(!plug("agentic-pockets") ? ["The house plugin, agentic-pockets, is not in Paseo."] : plug("agentic-pockets")!.running === false ? ["agentic-pockets is not running."] : []),
     ...(plug("agentic-pockets-setup") ? [] : ["Setup, agentic-pockets-setup, is not in Paseo."]),
     ...(!chat ? ["Beautiful Pockets is not in Paseo."] : chat.running === false ? [`${chat.id} is not running.`] : []),
   ]));
 
   // 6. Beautiful Pockets built, unless this Paseo keeps Beautiful Chat.
-  if (plug(BEAUTIFUL_CHAT) && !plug(BEAUTIFUL_POCKETS)) out.push({ what: "Beautiful Pockets built", ok: true, detail: "Not needed: this Paseo keeps Beautiful Chat." });
+  if (i.plugins !== null && plug(BEAUTIFUL_CHAT) && !plug(BEAUTIFUL_POCKETS)) out.push({ what: "Beautiful Pockets built", ok: true, detail: "Not needed: this Paseo keeps Beautiful Chat." });
   else out.push(line("Beautiful Pockets built", !i.beautifulPockets.folder ? ["Its folder, plugins/beautiful-pockets, is missing."] : i.beautifulPockets.built ? [] : ["Its build did not finish."]));
 
   // 7. The workspaces: each desk row's workspace is still in Paseo. A list that cannot be read is not checked.
@@ -106,10 +107,10 @@ export async function readHouseInputs(root: string, exec: Exec, claudeAt: string
   let record: Record<string, unknown> | null = null;
   try { record = JSON.parse(fs.readFileSync(path.join(root, "house.json"), "utf8")); } catch { /* unreadable: line 3 says so */ }
   const placed = Array.isArray(record?.placedCitizens) ? (record!.placedCitizens as string[]) : [];
-  let plugins: StatusInput["plugins"];
+  let plugins: StatusInput["plugins"] = null;
   const ls = exec("paseo", ["plugin", "ls", "--json"], { timeout: 20_000 });
   try { plugins = (JSON.parse(ls.stdout.slice(ls.stdout.search(/[[{]/))) as { id?: string; name?: string; status?: string }[]).map((p) => ({ id: String(p.id ?? p.name), running: p.status ? p.status === "running" : null })); }
-  catch { plugins = (await configPlugins().catch(() => [] as string[])).map((id) => ({ id, running: null })); }
+  catch { plugins = await configPlugins().then((ids) => ids.map((id) => ({ id, running: null })), () => null); }
   let workspaces: string[] | null = null;
   try {
     const w = JSON.parse(fs.readFileSync(path.join(process.env.PASEO_HOME || path.join(os.homedir(), ".paseo"), "projects", "workspaces.json"), "utf8"));

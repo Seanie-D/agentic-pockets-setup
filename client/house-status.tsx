@@ -4,9 +4,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Pressable, Text, View } from "react-native";
 import { houseStatusRpc, repairRpc } from "../shared/contracts";
 
-// Item 4b of the next update: below the
-// steps, once setup has ended, the setup status (house-check's seven lines, each a tick or what is missing) and the
-// Repair my setup button, which sends Jarvis's desk the house-check request and opens that desk.
+// Item 4b of the next update: below the steps, once setup has ended, the setup status (house-check's seven lines, each a
+// tick or what is missing) and the Repair my setup button, which sends Jarvis's desk the house-check request and opens it.
 type S = { h2: object; p: object; muted: object; good: object; bad: object; card: object; row: object; button: object; buttonText: object; quiet: object; quietText: object; locked: object };
 export function HouseStatus({ s, navigation }: { s: S; navigation: PluginScreenProps["navigation"] }) {
   const read = useRpc(houseStatusRpc);
