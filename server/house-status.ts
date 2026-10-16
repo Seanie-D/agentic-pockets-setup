@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { BEAUTIFUL_CHAT, BEAUTIFUL_POCKETS, BUILT } from "../shared/beautiful-pockets.ts";
-import { checkTools } from "./tools.ts";
+import { checkTools, NEED_CLAUDE } from "./tools.ts";
 import type { Exec } from "./setup.ts";   // a type only, so no import cycle at run time
 
 // unknown: the line could not be checked (its source could not be read), so it is neither a tick nor a fault.
@@ -21,7 +21,6 @@ export interface StatusInput {
   workspaces: string[] | null;                          // the live workspace ids Paseo has; null: its list could not be read
 }
 
-const NEED_CLAUDE = "2.1.280";
 const show = (n: string) => n.replace(/([a-z])([A-Z])/g, "$1 $2");
 const line = (what: string, problems: string[], okDetail = "As it should be."): StatusLine =>
   ({ what, ok: problems.length === 0, detail: problems.length ? problems.join(" ") : okDetail });

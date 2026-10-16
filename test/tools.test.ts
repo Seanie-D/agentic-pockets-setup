@@ -288,7 +288,7 @@ test("an old npm copy runs first and a newer copy is here: Paseo is told to use 
   assert.ok(!calls.some((c) => /^(sh|npm|sudo)\b/.test(c) || /^brew (install|upgrade)/.test(c) || c.endsWith(" update")), calls.join("\n"));
 });
 
-// Nick's real case (Sean's photo, 15:55 CDT): Anthropic's own install ran first at 2.1.220; Homebrew's 2.1.300 came after
+// Nick's real case: Anthropic's own install ran first at 2.1.220; Homebrew's 2.1.300 came after
 // it. With item 7a the newer Homebrew copy is used as it is: no update is run.
 test("an old copy of Anthropic's own runs first and Homebrew's is newer: Paseo uses Homebrew's; nothing is updated", () => {
   const LOCAL = "/Users/nickloux/.local/bin/claude", BREW = "/opt/homebrew/bin/claude";
