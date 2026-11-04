@@ -4,7 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { workspaceOf } from "../shared/workspace-here.ts";
+import { computerId, workspaceOf } from "../shared/workspace-here.ts";
 import { leadOf, readTutorial } from "./tutorial.ts";
 import { MODES, type Mode } from "../shared/mode.ts";
 
@@ -32,7 +32,7 @@ export async function reach(root: string, citizen: string, line: string, deps: D
   const desk = deskOf(root, citizen, deps.records());
   if (desk) { await deps.send(desk, line); return { agentId: desk }; }
   let row: DeskRow | undefined; try { row = JSON.parse(fs.readFileSync(path.join(root, "house.json"), "utf8")).desks?.[citizen]; } catch { /* no record */ }
-  const workspaceId = workspaceOf(row, os.hostname());
+  const workspaceId = workspaceOf(row, computerId());
   if (!row || !workspaceId) return { error: row ? `${citizen} has no home on this computer yet. Add ${citizen} again in the Citizens view to give them one.` : `${citizen} has no desk row in the house record, so no desk can be opened.` };
   return { agentId: await deps.open({ ...row, workspaceId }, citizen, line) };
 }

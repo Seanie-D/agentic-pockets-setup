@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { workspaceOf } from "../shared/workspace-here.ts";
+import { computerId, workspaceOf } from "../shared/workspace-here.ts";
 import { readTutorial } from "./tutorial.ts";
 import { deskOf, type DiscussDeps } from "./discuss.ts";
 import { REWARD_KIND } from "../shared/reward.ts";
@@ -32,7 +32,7 @@ export async function rewardPass(root: string, deps: RewardDeps, now: string): P
     if (desk) await deps.send(desk, line);
     else {
       const row = rec.desks?.[t.lead];
-      const workspaceId = workspaceOf(row, os.hostname());
+      const workspaceId = workspaceOf(row, computerId());
       if (!row || !workspaceId) return;
       await deps.open({ ...row, workspaceId }, t.lead, line);
     }

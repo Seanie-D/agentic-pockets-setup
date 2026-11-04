@@ -51,7 +51,7 @@ function world(opts: { repo?: string; claim?: number; cafeFails?: boolean; chatF
       welcome: async (agentId, citizen) => { log.push(`welcome ${agentId} ${citizen}`); },
       openDesk: async (o) => { log.push(`desk ${o.title} ${o.provider}/${o.model} ${JSON.stringify(o.labels)} cwd=${o.cwd}`); return { agentId: "agent-1" }; },
     },
-    hostname: () => "Nicks-MacBook", doorman: "https://doorman.example", now: () => "2026-10-14T13:00:00.000Z",
+    hostname: () => "Nicks-MacBook", computerId: () => "Nicks-MacBook", doorman: "https://doorman.example", now: () => "2026-10-14T13:00:00.000Z",
   };
   return { deps, home, root, log, posts };
 }

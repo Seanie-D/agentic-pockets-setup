@@ -4,7 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { workspaceOf } from "../shared/workspace-here.ts";
+import { computerId, workspaceOf } from "../shared/workspace-here.ts";
 import { BEAUTIFUL_CHAT, BEAUTIFUL_POCKETS, BUILT } from "../shared/beautiful-pockets.ts";
 import { checkTools, NEED_CLAUDE } from "./tools.ts";
 import type { Exec } from "./setup.ts";   // a type only, so no import cycle at run time
@@ -120,5 +120,5 @@ export async function readHouseInputs(root: string, exec: Exec, claudeAt: string
     workspaces = all.filter((x) => x && !x.archivedAt && x.workspaceId).map((x) => String(x.workspaceId));
   } catch { /* unreadable: line 7 is not checked */ }
   return { tools: checkTools(exec, claudeAt), npm: exec("npm", ["--version"], { timeout: 20_000 }).status === 0, record,
-    pockets: Object.fromEntries(placed.map((n) => [n, readPocket(root, n)])), plugins, beautifulPockets: readBeautifulPockets(root), workspaces, host: os.hostname() };
+    pockets: Object.fromEntries(placed.map((n) => [n, readPocket(root, n)])), plugins, beautifulPockets: readBeautifulPockets(root), workspaces, host: computerId() };
 }

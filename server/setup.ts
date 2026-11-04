@@ -2,6 +2,7 @@
 // per picked citizen, and the first desk. Every outside effect goes through `deps`, so the same code runs for real
 // inside Paseo and against fakes in the tests. Built by Jarvis, 2026-10-12.
 import fs from "node:fs";
+import { computerId } from "../shared/workspace-here.ts";
 import path from "node:path";
 import { PROFILE_PROVIDER, profileDir } from "./profile.ts";
 import { DESK_WELCOME_ON, nameOf } from "../shared/desk-welcome.ts";
@@ -32,7 +33,7 @@ export interface Ops {
   welcome(agentId: string, citizen: string): Promise<void>;
   openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; mode?: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
 }
-export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; doorman: string; now: () => string }
+export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; computerId?: () => string; doorman: string; now: () => string }
 export interface SetupInput { paseoHome?: string; code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean; welcome?: boolean; mode?: Mode; cafe?: boolean }
 export interface SetupResult { ok: boolean; message: string; steps: string[]; firstDesk?: { citizen: string; agentId: string | null } }
 
@@ -289,7 +290,7 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
     const provider = input.accounts[n] ?? "claude";
     const mode = deskMode(provider);
     const releaseModel = provider.startsWith("claude") && typeof releaseModels[n] === "string" && releaseModels[n] ? releaseModels[n] : undefined;
-    desks[n] = { provider, model: input.models?.[n] ?? releaseModel ?? DEFAULT_MODEL[provider] ?? "default", workspaceId: spaces[n], workspaces: { [deps.hostname()]: spaces[n] }, ...(mode ? { mode } : {}) };
+    desks[n] = { provider, model: input.models?.[n] ?? releaseModel ?? DEFAULT_MODEL[provider] ?? "default", workspaceId: spaces[n], workspaces: { [deps.computerId?.() ?? computerId()]: spaces[n] }, ...(mode ? { mode } : {}) };
   }
   const first = input.citizens.includes("Ultron") ? "Ultron" : input.citizens[0];
   const provider = desks[first].provider;

@@ -83,7 +83,8 @@ test("Repair my setup reaches Jarvis's desk with the house-check line; a house w
 test("with no desk, the desk opens in this computer's workspace; a citizen with no home here gets a plain reason", async () => {
   const { reach } = await import("../server/discuss.ts");
   const root = house(["Verro"]);
-  const here = os.hostname();
+  process.env.AGENTIC_POCKETS_COMPUTER_ID = "HERE-PC";
+  const here = "HERE-PC";
   fs.writeFileSync(path.join(root, "house.json"), JSON.stringify({ desks: {
     Verro: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_work", workspaces: { "OTHER-PC": "wks_work", [here]: "wks_here" } },
     Jarvis: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_work", workspaces: { "OTHER-PC": "wks_work" } } } }));
