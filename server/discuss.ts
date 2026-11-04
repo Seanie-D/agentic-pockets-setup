@@ -4,7 +4,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { computerId, workspaceOf } from "../shared/workspace-here.ts";
+import { workspaceOf } from "../shared/workspace-here.ts";
+import { computerId } from "./computer-id.ts";
 import { leadOf, readTutorial } from "./tutorial.ts";
 import { MODES, type Mode } from "../shared/mode.ts";
 

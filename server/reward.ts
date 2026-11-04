@@ -3,7 +3,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { computerId, workspaceOf } from "../shared/workspace-here.ts";
+import { workspaceOf } from "../shared/workspace-here.ts";
+import { computerId } from "./computer-id.ts";
 import { readTutorial } from "./tutorial.ts";
 import { deskOf, type DiscussDeps } from "./discuss.ts";
 import { REWARD_KIND } from "../shared/reward.ts";

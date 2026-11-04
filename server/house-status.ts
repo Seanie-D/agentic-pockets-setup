@@ -4,7 +4,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { computerId, workspaceOf } from "../shared/workspace-here.ts";
+import { workspaceOf } from "../shared/workspace-here.ts";
+import { computerId } from "./computer-id.ts";
 import { BEAUTIFUL_CHAT, BEAUTIFUL_POCKETS, BUILT } from "../shared/beautiful-pockets.ts";
 import { checkTools, NEED_CLAUDE } from "./tools.ts";
 import type { Exec } from "./setup.ts";   // a type only, so no import cycle at run time

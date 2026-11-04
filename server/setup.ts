@@ -2,7 +2,7 @@
 // per picked citizen, and the first desk. Every outside effect goes through `deps`, so the same code runs for real
 // inside Paseo and against fakes in the tests. Built by Jarvis, 2026-10-12.
 import fs from "node:fs";
-import { computerId } from "../shared/workspace-here.ts";
+import { computerId } from "./computer-id.ts";
 import path from "node:path";
 import { PROFILE_PROVIDER, profileDir } from "./profile.ts";
 import { DESK_WELCOME_ON, nameOf } from "../shared/desk-welcome.ts";
