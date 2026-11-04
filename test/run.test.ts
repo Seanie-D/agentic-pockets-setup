@@ -157,9 +157,9 @@ test("the house record keeps each citizen's desk row (account, model, workspace,
   assert.equal(r.ok, true, r.message);
   const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
   assert.deepEqual(rec.desks, {
-    Ultron: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Ultron", mode: "auto" },
-    Verro: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Verro", mode: "auto" },
-    Jarvis: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Jarvis", mode: "auto" },
+    Ultron: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Ultron", workspaces: { "Nicks-MacBook": "wks_Ultron" }, mode: "auto" },
+    Verro: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Verro", workspaces: { "Nicks-MacBook": "wks_Verro" }, mode: "auto" },
+    Jarvis: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_Jarvis", workspaces: { "Nicks-MacBook": "wks_Jarvis" }, mode: "auto" },
   });
 });
 
@@ -200,7 +200,7 @@ test("Jarvis comes with every house: his pocket, workspace and desk row on the f
   assert.equal(fs.readFileSync(path.join(w.root, "Pockets", "Jarvis", "AGENTS.md"), "utf8"), "---\ntier: on-call\n---\n# Jarvis", "his pack, with the house's tier");
   const rec = JSON.parse(fs.readFileSync(path.join(w.root, "house.json"), "utf8"));
   assert.deepEqual(rec.citizens, ["Jarvis", "Verro"]);
-  assert.deepEqual(rec.desks.Jarvis, { provider: "codex", model: rec.desks.Verro.model, workspaceId: "wks_Jarvis" });
+  assert.deepEqual(rec.desks.Jarvis, { provider: "codex", model: rec.desks.Verro.model, workspaceId: "wks_Jarvis", workspaces: { "Nicks-MacBook": "wks_Jarvis" } });
   assert.deepEqual(w.log.filter((l) => l.startsWith("desk")).map((l) => l.split(" — ")[0]), ["desk Verro"]);
   assert.equal(r.firstDesk?.citizen, "Verro");
 });

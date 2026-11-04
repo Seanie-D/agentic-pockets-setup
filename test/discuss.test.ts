@@ -78,3 +78,17 @@ test("Repair my setup reaches Jarvis's desk with the house-check line; a house w
   assert.equal((await repair(noJarvis, g.deps)).citizen, "Verro");
   assert.deepEqual(g.log, [`open Verro wks_Verro ${repairLine}`]);
 });
+
+// One house on two computers (Jarvis's spec, 2026-11-04): a desk opens in this computer's own workspace, never the other's.
+test("with no desk, the desk opens in this computer's workspace; a citizen with no home here gets a plain reason", async () => {
+  const { reach } = await import("../server/discuss.ts");
+  const root = house(["Verro"]);
+  const here = os.hostname();
+  fs.writeFileSync(path.join(root, "house.json"), JSON.stringify({ desks: {
+    Verro: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_work", workspaces: { "OTHER-PC": "wks_work", [here]: "wks_here" } },
+    Jarvis: { provider: "claude", model: "claude-opus-5-5", workspaceId: "wks_work", workspaces: { "OTHER-PC": "wks_work" } } } }));
+  const f = fake([]);
+  assert.deepEqual(await reach(root, "Verro", "hi", f.deps), { agentId: "new-desk" });
+  assert.deepEqual(f.log, ["open Verro wks_here hi"]);
+  assert.deepEqual(await reach(root, "Jarvis", "hi", f.deps), { error: "Jarvis has no home on this computer yet. Add Jarvis again in the Citizens view to give them one." });
+});

@@ -10,9 +10,10 @@ export interface WorkspaceRecord { workspaceId: string; cwd?: string; archivedAt
 const norm = (p: string) => { const s = p.replace(/\\/g, "/").replace(/\/+$/, ""); return /^[a-z]:\//i.test(s) ? s.toLowerCase() : s; };
 
 export function helpButton(record: unknown, complete: boolean, root?: string, workspaces: WorkspaceRecord[] = []): { workspaceIds: string[]; label: "Setup" | "Help!" } {
-  const desks = (record as { desks?: Record<string, { workspaceId?: unknown }> } | null)?.desks ?? {};
+  const desks = (record as { desks?: Record<string, { workspaceId?: unknown; workspaces?: Record<string, unknown> }> } | null)?.desks ?? {};
   const ids = new Set<string>();
-  for (const row of Object.values(desks)) if (typeof row?.workspaceId === "string" && row.workspaceId) ids.add(row.workspaceId);
+  // Every computer's workspaces (one house on two computers): an id from the other computer matches nothing here.
+  for (const row of Object.values(desks)) for (const id of [row?.workspaceId, ...Object.values(row?.workspaces ?? {})]) if (typeof id === "string" && id) ids.add(id);
   if (root) {
     const pockets = new Set(Object.keys(desks).map((c) => norm(`${root}/Pockets/${c}`)));
     for (const w of workspaces) if (w?.workspaceId && !w.archivedAt && w.cwd && pockets.has(norm(w.cwd))) ids.add(w.workspaceId);

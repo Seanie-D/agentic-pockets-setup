@@ -4,6 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { workspaceOf } from "../shared/workspace-here.ts";
 import { BEAUTIFUL_CHAT, BEAUTIFUL_POCKETS, BUILT } from "../shared/beautiful-pockets.ts";
 import { checkTools, NEED_CLAUDE } from "./tools.ts";
 import type { Exec } from "./setup.ts";   // a type only, so no import cycle at run time
@@ -19,6 +20,7 @@ export interface StatusInput {
   plugins: { id: string; running: boolean | null }[] | null;   // running null: Paseo could not say; null: no list at all
   beautifulPockets: { folder: boolean; built: boolean };
   workspaces: string[] | null;                          // the live workspace ids Paseo has; null: its list could not be read
+  host?: string;                                        // this computer's name: a desk row's workspace is read for it
 }
 
 const show = (n: string) => n.replace(/([a-z])([A-Z])/g, "$1 $2");
@@ -27,7 +29,7 @@ const line = (what: string, problems: string[], okDetail = "As it should be."): 
 
 export function houseStatus(i: StatusInput): StatusLine[] {
   const tool = (n: string) => i.tools.find((t) => t.name === n);
-  const rec = (i.record ?? {}) as { setupDone?: unknown; userName?: unknown; release?: { id?: unknown; setupRef?: unknown }; citizens?: unknown; placedCitizens?: unknown; mode?: unknown; desks?: Record<string, { workspaceId?: unknown }> };
+  const rec = (i.record ?? {}) as { setupDone?: unknown; userName?: unknown; release?: { id?: unknown; setupRef?: unknown }; citizens?: unknown; placedCitizens?: unknown; mode?: unknown; desks?: Record<string, { workspaceId?: unknown; workspaces?: Record<string, unknown> }> };
   const placed = Array.isArray(rec.placedCitizens) ? (rec.placedCitizens as string[]) : [];
   const desks = rec.desks ?? {};
   const out: StatusLine[] = [];
@@ -52,7 +54,8 @@ export function houseStatus(i: StatusInput): StatusLine[] {
   out.push(line("The house record", i.record === null ? ["house.json cannot be read."] : [
     ...(rec.setupDone === true ? [] : ["Setup is not marked finished."]),
     ...(missingKeys.length ? [`It lacks ${missingKeys.join(", ")}.`] : []),
-    ...placed.filter((n) => !desks[n]?.workspaceId).map((n) => `${show(n)} has no desk row.`),
+    ...placed.filter((n) => !workspaceOf(desks[n])).map((n) => `${show(n)} has no desk row.`),
+    ...placed.filter((n) => workspaceOf(desks[n]) && !workspaceOf(desks[n], i.host)).map((n) => `${show(n)} has no home on this computer yet: Add gives one.`),
   ]));
 
   // 4. Each placed citizen's pocket: its files, and its tier as the house's mode says.
@@ -82,7 +85,7 @@ export function houseStatus(i: StatusInput): StatusLine[] {
 
   // 7. The workspaces: each desk row's workspace is still in Paseo. A list that cannot be read is not checked.
   if (i.workspaces === null) out.push({ what: "The workspaces", ok: true, unknown: true, detail: "Not checked: Paseo's list of workspaces could not be read." });
-  else { const live = i.workspaces; out.push(line("The workspaces", placed.filter((n) => desks[n]?.workspaceId && !live.includes(String(desks[n].workspaceId))).map((n) => `${show(n)}'s workspace is missing.`))); }
+  else { const live = i.workspaces; out.push(line("The workspaces", placed.filter((n) => workspaceOf(desks[n], i.host) && !live.includes(workspaceOf(desks[n], i.host)!)).map((n) => `${show(n)}'s workspace is missing.`))); }
   return out;
 }
 
@@ -117,5 +120,5 @@ export async function readHouseInputs(root: string, exec: Exec, claudeAt: string
     workspaces = all.filter((x) => x && !x.archivedAt && x.workspaceId).map((x) => String(x.workspaceId));
   } catch { /* unreadable: line 7 is not checked */ }
   return { tools: checkTools(exec, claudeAt), npm: exec("npm", ["--version"], { timeout: 20_000 }).status === 0, record,
-    pockets: Object.fromEntries(placed.map((n) => [n, readPocket(root, n)])), plugins, beautifulPockets: readBeautifulPockets(root), workspaces };
+    pockets: Object.fromEntries(placed.map((n) => [n, readPocket(root, n)])), plugins, beautifulPockets: readBeautifulPockets(root), workspaces, host: os.hostname() };
 }

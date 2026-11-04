@@ -68,3 +68,14 @@ test("a plugin list that cannot be read is not checked, not three faults", () =>
   assert.deepEqual([by["Paseo's plugins"].ok, by["Paseo's plugins"].unknown, by["Paseo's plugins"].detail], [true, true, "Not checked: Paseo's list of plugins could not be read."]);
   assert.equal(by["Beautiful Pockets built"].ok, true, "the build line still reads the folder");
 });
+
+// One house on two computers (Jarvis's spec, 2026-11-04): each desk row keeps its workspace per computer.
+test("on a second computer, a citizen with no home there is named, and its workspace is read for this computer", () => {
+  const two = (host: string): StatusInput => ({ ...good(), host, workspaces: ["w1", "w2"],
+    record: { ...(good().record as object), desks: { Verro: { workspaceId: "w1", workspaces: { WORK: "w1", HOME: "h1" } }, Jarvis: { workspaceId: "w2", workspaces: { WORK: "w2" } } } } });
+  const by = (host: string) => Object.fromEntries(houseStatus(two(host)).map((l) => [l.what, l]));
+  assert.equal(by("WORK")["The house record"].ok, true);
+  assert.equal(by("WORK")["The workspaces"].ok, true);
+  assert.equal(by("HOME")["The house record"].detail, "Jarvis has no home on this computer yet: Add gives one.");
+  assert.equal(by("HOME")["The workspaces"].detail, "Verro's workspace is missing.", "HOME's own workspace h1 is not in this Paseo's list");
+});

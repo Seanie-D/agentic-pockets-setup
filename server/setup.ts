@@ -283,12 +283,13 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   // 5.5), on a Claude account only: the ids are Claude's.
   let releaseModels: Record<string, string> = {};
   try { releaseModels = JSON.parse(fs.readFileSync(path.join(upstream, "RELEASE.json"), "utf8")).models ?? {}; } catch { /* an older release */ }
-  const desks: Record<string, { provider: string; model: string; workspaceId: string; mode?: string }> = {};
+  // Each workspace is this computer's (one house on two computers: shared/workspace-here.ts).
+  const desks: Record<string, { provider: string; model: string; workspaceId: string; workspaces: Record<string, string>; mode?: string }> = {};
   for (const n of input.citizens) {
     const provider = input.accounts[n] ?? "claude";
     const mode = deskMode(provider);
     const releaseModel = provider.startsWith("claude") && typeof releaseModels[n] === "string" && releaseModels[n] ? releaseModels[n] : undefined;
-    desks[n] = { provider, model: input.models?.[n] ?? releaseModel ?? DEFAULT_MODEL[provider] ?? "default", workspaceId: spaces[n], ...(mode ? { mode } : {}) };
+    desks[n] = { provider, model: input.models?.[n] ?? releaseModel ?? DEFAULT_MODEL[provider] ?? "default", workspaceId: spaces[n], workspaces: { [deps.hostname()]: spaces[n] }, ...(mode ? { mode } : {}) };
   }
   const first = input.citizens.includes("Ultron") ? "Ultron" : input.citizens[0];
   const provider = desks[first].provider;
