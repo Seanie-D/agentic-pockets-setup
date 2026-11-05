@@ -12,6 +12,7 @@ import { DEFAULT_MODE, tierFor, withTier, type Mode } from "../shared/mode.ts";
 import { CAFE, withOptOut } from "../shared/cafe.ts";
 import { BEAUTIFUL_CHAT, BEAUTIFUL_POCKETS, BUILT } from "../shared/beautiful-pockets.ts";
 import { filesIn, pieceHash, pieceRoot } from "./pieces.ts";
+import { clonedBuild, JEV_SAYS, saveJevKey, testJevKey } from "./jev-key.ts";
 
 const SETUP_ID = "agentic-pockets-setup";   // this plugin's own Paseo id (paseo-plugin.json)
 export interface Exec { (cmd: string, args: string[], o?: { env?: Record<string, string>; cwd?: string; timeout?: number }): { status: number | null; stdout: string; stderr: string } }
@@ -34,8 +35,9 @@ export interface Ops {
   openDesk(o: { workspaceId: string; cwd: string; provider: string; model: string; mode?: string; title: string; labels: Record<string, string>; firstLine: string }): Promise<{ agentId: string | null }>;
 }
 export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; computerId?: () => string; doorman: string; now: () => string }
-export interface SetupInput { paseoHome?: string; code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean; welcome?: boolean; mode?: Mode; cafe?: boolean }
-export interface SetupResult { ok: boolean; message: string; steps: string[]; firstDesk?: { citizen: string; agentId: string | null } }
+export interface SetupInput { paseoHome?: string; code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean; welcome?: boolean; mode?: Mode; cafe?: boolean; jevKey?: string }
+// jev: a TypeSafe key that failed its test, and how (the screen then offers to go on without Jev).
+export interface SetupResult { ok: boolean; message: string; steps: string[]; firstDesk?: { citizen: string; agentId: string | null }; jev?: "bad" | "no-answer" }
 
 // The first line of the first desk (ticket 004 Q11): setup is not finished, so the citizen says hello, sends the user
 // back to finish, and says they can ask it anything at any time.
@@ -76,7 +78,7 @@ export const sshCommand = (key: string) =>
   `ssh -i '${key.replace(/\\/g, "/").replace(/'/g, "'\\''")}' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new`;
 
 // Steps 1–3: the house key, the invite, the download (or an update, when the house is already here).
-export async function connect(input: Pick<SetupInput, "code" | "root" | "home">, deps: Deps): Promise<SetupResult> {
+export async function connect(input: Pick<SetupInput, "code" | "root" | "home" | "jevKey">, deps: Deps): Promise<SetupResult> {
   const steps: string[] = [];
   const fail = (message: string): SetupResult => ({ ok: false, message, steps });
   const keys = path.join(input.home, ".agentic-pockets", "keys");
@@ -94,6 +96,15 @@ export async function connect(input: Pick<SetupInput, "code" | "root" | "home">,
 
   // 2 + 3. The invite and the download. A house already downloaded skips the invite and updates instead.
   if (!fs.existsSync(path.join(upstream, ".git")) && !fs.existsSync(path.join(upstream, "Pockets"))) {
+    // The Jev switch, ticket 03: an owner's TypeSafe key is tested with one call before the invite is used, and saved on a
+    // pass; the release's `jev` branch is then cloned. No key is today's run.
+    const jevKey = input.jevKey?.trim() ?? "";
+    if (jevKey) {
+      const t = await testJevKey(jevKey, deps.fetch);
+      if (t !== "pass") return { ok: false, message: JEV_SAYS[t], steps, jev: t };
+      saveJevKey(input.home, jevKey, deps.now());
+      steps.push("Jev accepted your key. It is saved on this computer only.");
+    }
     const publicKey = fs.readFileSync(`${key}.pub`, "utf8").trim();
     let res: Response;
     try { res = await deps.fetch(`${deps.doorman}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: input.code.trim(), publicKey, house: deps.hostname() }) }); }
@@ -105,10 +116,10 @@ export async function connect(input: Pick<SetupInput, "code" | "root" | "home">,
     if (!PLAIN_REPO.test(body.repo)) return fail("The invite service sent a download address that is not one setup can trust, so nothing was downloaded. Ask the person who invited you.");
     steps.push("Your invite was accepted.");
     fs.mkdirSync(input.root, { recursive: true });
-    const r = deps.exec("git", ["clone", "--depth", "50", body.repo, upstream], { env: { GIT_SSH_COMMAND: ssh } });
-    if (r.status !== 0) return fail(`Downloading the house failed: ${r.stderr.trim().slice(0, 200)}`);
+    const r = deps.exec("git", ["clone", "--depth", "50", ...(jevKey ? ["--branch", "jev"] : []), body.repo, upstream], { env: { GIT_SSH_COMMAND: ssh } });
+    if (r.status !== 0) return fail(`Downloading the ${jevKey ? "Jev version of the " : ""}house failed: ${r.stderr.trim().slice(0, 200)}`);
     deps.exec("git", ["-C", upstream, "config", "core.sshCommand", ssh]);
-    steps.push("Downloaded the house.");
+    steps.push(jevKey ? "Downloaded the house, with Jev." : "Downloaded the house.");
   } else {
     const r = deps.exec("git", ["-C", upstream, "pull", "--ff-only"]);
     steps.push(r.status === 0 ? "Updated the house." : "Could not update the house; using the copy already here.");
@@ -331,6 +342,9 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   // already there came from an update, and is never set back.
   const prior = rec.updates as { line?: string } | undefined;
   const updates = prior?.line || !m?.id ? prior : { ...(prior ?? {}), line: m.number ?? m.id };
-  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off, extrasSettings: extrasSettingsOut } : {}), seasonSettings: sz.settings, desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, placedCitizens, mode, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, ...(release ? { release } : {}), ...(updates ? { updates } : {}), createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
+  // The version this house runs (the Jev switch, ticket 01): `jev` when the release's jev branch was cloned; no field is
+  // the version without Jev.
+  const build = clonedBuild(upstream);
+  fs.writeFileSync(recFile, JSON.stringify({ ...rec, userName: name, ...(off.length ? { extrasOff: off, extrasSettings: extrasSettingsOut } : {}), seasonSettings: sz.settings, desks: { ...(rec.desks as object ?? {}), ...desks }, citizens, placedCitizens, mode, accounts: { ...(rec.accounts as object ?? {}), ...input.accounts }, ...(release ? { release } : {}), ...(updates ? { updates } : {}), ...(build ? { build } : {}), createdAt: rec.createdAt ?? deps.now(), updatedAt: deps.now(), setupDone: false }, null, 2) + "\n");
   return { ok: true, message: `${first} is ready. Finish setup here, then say hello.`, steps, firstDesk: { citizen: first, agentId: desk.agentId } };
 }

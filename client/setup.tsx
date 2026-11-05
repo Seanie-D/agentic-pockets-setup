@@ -21,6 +21,8 @@ import { HouseStatus } from "./house-status";
 
 const NAMES: Record<string, string> = { MissMinutes: "Miss Minutes" };
 const label = (n: string) => NAMES[n] ?? n;
+// The Jev field's line (the Jev switch, ticket 03): what Jev is, and that the key is the owner's and billed to them.
+const JEV_LINE = "Jev (optional): a fast helper your citizens ask for quick yes/no picks. It needs your own TypeSafe key, and TypeSafe bills you for it. Paste your key here, or leave this empty.";
 const ULTRON_LINE = "The Orchestrator, a catch-all agent that can coordinate efforts to your other Pocket Citizens or be your funnel for everything. One-size-fits-all, a more dialed-in Claude type experience that remembers who you are and what you need.";
 
 // The Life map, from the setup screen (the owner on TH5, 2026-10-15: "Agentic Pockets Setup also needs a Life Map button
@@ -70,6 +72,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   const doInstall = useMutation({ mutationFn: untilDone(useRpc(installRpc)), onSuccess: () => st.refetch() });
   const doFinish = useMutation({ mutationFn: useRpc(finishRpc), onSuccess: () => st.refetch() });
   const [code, setCode] = useState("");
+  const [jevKey, setJevKey] = useState("");   // the owner's TypeSafe key: optional, never shown (the Jev switch, ticket 03)
   const [userName, setUserName] = useState("");
   const [pick, setPick] = useState<Pick>(emptyPick());
   const [accounts, setAccounts] = useState<Record<string, string>>({});
@@ -195,11 +198,17 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
         <View style={{ gap: 8 }}>
           <Text style={s.muted}>Paste the code from your invite page.</Text>
           <TextInput accessibilityLabel="Invite code" style={s.input} value={code} onChangeText={setCode} autoCapitalize="none" autoCorrect={false} placeholder="Invite code" placeholderTextColor={c.foregroundMuted} />
-          <Pressable accessibilityRole="button" style={[s.button, (!toolsOk || !claudeIn || code.trim().length < 8 || doConnect.isPending) && s.locked]} disabled={!toolsOk || !claudeIn || code.trim().length < 8 || doConnect.isPending} onPress={() => doConnect.mutate({ code: code.trim() })}>
+          <Text style={s.muted}>{JEV_LINE}</Text>
+          <TextInput accessibilityLabel="TypeSafe key for Jev (optional)" style={s.input} value={jevKey} onChangeText={setJevKey} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder="TypeSafe key (optional)" placeholderTextColor={c.foregroundMuted} />
+          <Pressable accessibilityRole="button" style={[s.button, (!toolsOk || !claudeIn || code.trim().length < 8 || doConnect.isPending) && s.locked]} disabled={!toolsOk || !claudeIn || code.trim().length < 8 || doConnect.isPending} onPress={() => doConnect.mutate({ code: code.trim(), jevKey: jevKey.trim() })}>
             <Text style={s.buttonText}>{doConnect.isPending ? "Connecting…" : "Connect my house"}</Text>
           </Pressable>
           {!toolsOk ? <Text style={s.muted}>First get the tools above, then connect.</Text> : !claudeIn && <Text style={s.muted}>First sign in to Claude above, then connect.</Text>}
           {doConnect.data && !doConnect.data.ok && <Text style={s.bad}>{doConnect.data.message}</Text>}
+          {/* A key that failed its test: the owner fixes it above, or goes on with the version without Jev. */}
+          {doConnect.data?.jev && !doConnect.isPending && <Pressable accessibilityRole="button" style={[s.quiet, { alignSelf: "flex-start" }]} onPress={() => { setJevKey(""); doConnect.mutate({ code: code.trim(), jevKey: "" }); }}>
+            <Text style={s.quietText}>Go on without Jev</Text>
+          </Pressable>}
           {doConnect.isError && <Text style={s.bad}>{String(doConnect.error)}</Text>}
         </View>
       )}

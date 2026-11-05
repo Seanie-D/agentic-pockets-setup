@@ -18,21 +18,48 @@ function upstream() {
   for (const n of ["Ultron", "Jarvis", "Verro", "Vision", "Friday", "MissMinutes"]) { w(`Pockets/${n}/AGENTS.md`, `# ${n}`); w(`Pockets/${n}/face.png`, `png-${n}`); }
   return u;
 }
-function world(opts: { repo?: string; claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[]; pin?: () => Promise<string | null>; pinNode?: (ids: string[]) => Promise<string | null>; deskOf?: (cwd: string) => Promise<string | null>; release?: object } = {}) {
+// The release repo's second branch, `jev`: the same house, with the Jev skill (ticket 03 of the Jev switch).
+function jevBranch(main: string) {
+  const u = fs.mkdtempSync(path.join(os.tmpdir(), "upstream-jev-"));
+  fs.cpSync(main, u, { recursive: true });
+  fs.mkdirSync(path.join(u, "Commons", "skills", "thinking", "jev"), { recursive: true });
+  fs.writeFileSync(path.join(u, "Commons", "skills", "thinking", "jev", "SKILL.md"), "# Jev\n");
+  return u;
+}
+// jev: how Jev answers the key test (an HTTP status, or "no answer" for a call that never comes back); noJevBranch: a
+// release repo with `main` alone.
+function world(opts: { repo?: string; claim?: number; cafeFails?: boolean; chatFails?: boolean; installed?: string[]; pin?: () => Promise<string | null>; pinNode?: (ids: string[]) => Promise<string | null>; deskOf?: (cwd: string) => Promise<string | null>; release?: object; jev?: number | "no answer"; noJevBranch?: boolean } = {}) {
   const up = upstream();
   if (opts.release) fs.writeFileSync(path.join(up, "RELEASE.json"), JSON.stringify(opts.release));
+  const upJev = opts.noJevBranch ? null : jevBranch(up);
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "home-")); const root = path.join(home, "agentic-pockets");
-  const log: string[] = []; const posts: any[] = [];
+  const log: string[] = []; const posts: any[] = []; const jevCalls: { auth: string; body: any; signal: unknown }[] = []; const calls: string[] = [];
   const deps: Deps = {
     exec: (cmd, args, o) => {
       log.push(`${cmd} ${args.join(" ")}${o?.env?.GIT_SSH_COMMAND ? ` [ssh: ${o.env.GIT_SSH_COMMAND}]` : ""}`);
       if (cmd === "ssh-keygen") { const f = args[args.indexOf("-f") + 1]; fs.writeFileSync(f, "PRIVATE"); fs.writeFileSync(`${f}.pub`, "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHouseKeyHouseKeyHouseKeyHouseKeyHouseKe house"); return { status: 0, stdout: "", stderr: "" }; }
-      if (cmd === "git" && args[0] === "clone") { fs.cpSync(up, args[args.length - 1], { recursive: true }); return { status: 0, stdout: "", stderr: "" }; }
+      // A clone takes one branch: `--branch <name>`, else the default, `main`. Git records it in .git/HEAD.
+      if (cmd === "git" && args[0] === "clone") {
+        const branch = args.includes("--branch") ? args[args.indexOf("--branch") + 1] : "main";
+        const from = branch === "main" ? up : branch === "jev" ? upJev : null;
+        if (!from) return { status: 128, stdout: "", stderr: `fatal: Remote branch ${branch} not found in upstream origin` };
+        const to = args[args.length - 1];
+        fs.cpSync(from, to, { recursive: true });
+        fs.mkdirSync(path.join(to, ".git"), { recursive: true }); fs.writeFileSync(path.join(to, ".git", "HEAD"), `ref: refs/heads/${branch}\n`);
+        return { status: 0, stdout: "", stderr: "" };
+      }
       if (cmd === "git") return { status: 0, stdout: "", stderr: "" };
       if (cmd === "claude") { log[log.length - 1] += ` @${path.basename(o?.cwd ?? "?")}`; return { status: 0, stdout: "", stderr: "" }; }
       return { status: 1, stdout: "", stderr: `unexpected ${cmd}` };
     },
     fetch: async (url, init) => {
+      calls.push(String(url));
+      if (String(url) === "https://api.typesafe.ai/v1/systemone") {
+        jevCalls.push({ auth: String((init?.headers as Record<string, string>)?.Authorization), body: JSON.parse(String(init?.body)), signal: init?.signal });
+        if (opts.jev === "no answer") throw new TypeError("fetch failed");
+        const s = opts.jev ?? 200;
+        return new Response(JSON.stringify(s === 200 ? { model: "jev-latest", answers: { q: { answer: true, confidence: 0.99 } } } : { error: "invalid api key" }), { status: s });
+      }
       posts.push({ url, body: JSON.parse(String(init?.body)) });
       const s = opts.claim ?? 200;
       return new Response(JSON.stringify(s === 200 ? { repo: opts.repo ?? "git@github.com:Seanie-D/agentic-pockets.git" } : { error: "this invite has already been used" }), { status: s });
@@ -53,7 +80,7 @@ function world(opts: { repo?: string; claim?: number; cafeFails?: boolean; chatF
     },
     hostname: () => "Nicks-MacBook", computerId: () => "Nicks-MacBook", doorman: "https://doorman.example", now: () => "2026-10-14T13:00:00.000Z",
   };
-  return { deps, home, root, log, posts };
+  return { deps, home, root, log, posts, jevCalls, calls };
 }
 const accounts = { Ultron: "claude", Verro: "claude", Vision: "claude" };
 
@@ -604,4 +631,81 @@ test("the first desk's line asks for a hello to a ready house, not a setup remin
   const l = setupLine("/Users/nick/agentic-pockets/house.json");
   assert.doesNotMatch(l, /not finished|send them back|finish it/i, l);
   assert.match(l, /^\[SETUP\] /); assert.match(l, /Say hello in one or two plain sentences/); assert.match(l, /setupDone/);
+});
+
+// The Jev switch, ticket 03: step 2 takes an optional TypeSafe key. A key that passes one yes/no call to Jev is saved on
+// this computer, the release's `jev` branch is cloned, and the house record names the version; no key is today's run.
+const KEY = "tsk-owner-key-0123456789";
+const jevFile = (home: string) => path.join(home, ".config", "pockets", "jev.env");
+const houseText = (root: string) => fs.readFileSync(path.join(root, "house.json"), "utf8");
+
+test("a key that passes: one yes/no call to Jev first, the key saved for the owner alone, the Jev version cloned and recorded", async () => {
+  const w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home, jevKey: `  ${KEY}\n` }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.equal(w.jevCalls.length, 1, "one test call");
+  assert.equal(w.jevCalls[0].auth, `Bearer ${KEY}`, "the pasted key, its ends trimmed");
+  assert.equal(w.jevCalls[0].body.model, "jev-latest");
+  assert.deepEqual(Object.values(w.jevCalls[0].body.questions).map((q: any) => q.type), ["noul"], "one yes/no question");
+  assert.ok(w.jevCalls[0].signal instanceof AbortSignal, "the call has a time limit");
+  assert.deepEqual(w.calls, ["https://api.typesafe.ai/v1/systemone", "https://doorman.example/claim"], "the key is tested before the invite is used");
+  assert.ok(w.log.some((l) => l.startsWith("git clone") && / --branch jev /.test(l)), "the Jev version is cloned");
+  assert.ok(fs.existsSync(path.join(w.root, "Commons", "skills", "thinking", "jev", "SKILL.md")), "the house holds the Jev skill");
+  assert.equal(JSON.parse(houseText(w.root)).build, "jev");
+  const f = jevFile(w.home);
+  assert.equal(fs.statSync(path.dirname(f)).mode & 0o777, 0o700);
+  assert.equal(fs.statSync(f).mode & 0o777, 0o600);
+  const lines = fs.readFileSync(f, "utf8").trim().split("\n");
+  assert.match(lines[0], /^# jev\b/, "a comment line first, as secret-intake writes");
+  assert.equal(lines[1], `JEV_API_KEY='${KEY}'`);
+  assert.ok(!houseText(w.root).includes(KEY), "the key is not in the house record");
+  assert.ok(![r.message, ...r.steps, ...w.log].some((x) => x.includes(KEY)), "the key is in no step and no log line");
+});
+
+test("a key Jev refuses: the owner is told plainly, nothing is used or saved, and the run goes on without Jev", async () => {
+  const w = world({ jev: 401 });
+  const input = { code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home };
+  const bad = await runSetup({ ...input, jevKey: KEY }, w.deps);
+  assert.equal(bad.ok, false); assert.equal(bad.jev, "bad");
+  assert.match(bad.message, /Jev did not accept that key/);
+  assert.ok(!bad.message.includes(KEY));
+  assert.ok(!w.posts.length && !w.log.some((l) => l.startsWith("git clone")), "the invite is not used and nothing is downloaded");
+  assert.ok(!fs.existsSync(jevFile(w.home)), "no key file");
+  // A key with a space or a quote in it cannot be a key the Jev scripts read: refused with no call.
+  const spaced = await runSetup({ ...input, jevKey: "tsk one two" }, w.deps);
+  assert.equal(spaced.jev, "bad"); assert.equal(w.jevCalls.length, 1, "no call for it");
+  // Going on without Jev: the field emptied, the run is today's.
+  const r = await runSetup(input, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.ok(w.log.some((l) => l.startsWith("git clone") && !l.includes("--branch")), "the default branch, as today");
+  assert.equal(JSON.parse(houseText(w.root)).build, undefined, "no version field: the version without Jev");
+  assert.ok(!fs.existsSync(path.join(w.root, "Commons", "skills", "thinking", "jev")));
+  assert.ok(!fs.existsSync(jevFile(w.home)));
+});
+
+test("Jev gives no answer: the owner is told it was not answered, not that the key is wrong", async () => {
+  for (const jev of ["no answer", 503] as const) {
+    const w = world({ jev });
+    const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home, jevKey: KEY }, w.deps);
+    assert.equal(r.ok, false, String(jev)); assert.equal(r.jev, "no-answer", String(jev));
+    assert.match(r.message, /Jev did not answer/);
+    assert.ok(!w.posts.length && !fs.existsSync(jevFile(w.home)));
+  }
+});
+
+test("no key: no call to Jev, the default branch, no version in the record, no key file, exactly as today", async () => {
+  const w = world();
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home, jevKey: "   " }, w.deps);
+  assert.equal(r.ok, true, r.message);
+  assert.equal(w.jevCalls.length, 0);
+  assert.ok(w.log.some((l) => l.startsWith("git clone --depth 50 git@github.com:Seanie-D/agentic-pockets.git ")), w.log.join("\n"));
+  assert.ok(!("build" in JSON.parse(houseText(w.root))));
+  assert.ok(!fs.existsSync(path.join(w.home, ".config")));
+});
+
+test("a release repo with no jev branch: the download fails in plain words, and naming Jev", async () => {
+  const w = world({ noJevBranch: true });
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home, jevKey: KEY }, w.deps);
+  assert.equal(r.ok, false); assert.match(r.message, /Jev version/);
+  assert.ok(!r.message.includes(KEY));
 });

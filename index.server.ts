@@ -83,7 +83,7 @@ export default function contribute(server: PluginServerContext) {
       return { tools };
     } catch (e) { return { tools: [], failed: String((e as Error)?.message ?? e).slice(0, 300) }; }
   }, { tools: [], running: true }));
-  server.handle(connectRpc, async ({ code, run }, { paseo }) => connectJob(run, () => connect({ code, root: ROOT, home: os.homedir() }, deps(paseo)).catch(failed), BUSY));
+  server.handle(connectRpc, async ({ code, jevKey, run }, { paseo }) => connectJob(run, () => connect({ code, jevKey, root: ROOT, home: os.homedir() }, deps(paseo)).catch(failed), BUSY));
   server.handle(profileStatusRpc, async () => ({ signedIn: signedIn(exec, os.homedir()) }));
   server.handle(profileSignInRpc, async () => startSignIn(profileDir(os.homedir())));
   server.handle(claudeStatusRpc, async () => ({ signedIn: signedInTo(exec, null) }));

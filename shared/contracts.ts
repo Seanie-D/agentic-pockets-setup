@@ -8,7 +8,8 @@ const Installed = Tool.extend({ action: z.enum(["kept", "installed", "updated", 
 const Extra = z.object({ id: z.string(), kind: z.enum(["hook", "skill", "agent", "command", "plugin", "mcp", "instructions", "paseo"]), name: z.string(), where: z.string(),
   switchable: z.boolean(), file: z.string().optional() });
 // running: the step is still at work (shared/job.ts); the screen calls again, and the same job answers.
-const Result = z.object({ ok: z.boolean(), message: z.string(), steps: z.array(z.string()), running: z.boolean().optional() });
+// jev: the owner's TypeSafe key failed its test at Connect, and how (the Jev switch, ticket 03).
+const Result = z.object({ ok: z.boolean(), message: z.string(), steps: z.array(z.string()), running: z.boolean().optional(), jev: z.enum(["bad", "no-answer"]).optional() });
 const FirstDesk = z.object({ citizen: z.string(), agentId: z.string().nullable() });
 const Mode = z.enum(["on-demand", "always-on"]);
 // What the last Start sent and made, kept by the server until Finish (server/form.ts), so a rebuilt screen keeps it.
@@ -24,7 +25,8 @@ export const status = defineRpc({
 });
 // run: the screen's id for one press (shared/job.ts), so a repeated call of that press joins its job.
 export const installToolsRpc = defineRpc({ name: "setup.tools.install", input: z.object({ run: z.string().default("") }), output: z.object({ tools: z.array(Installed), running: z.boolean().optional(), failed: z.string().optional() }) });
-export const connectRpc = defineRpc({ name: "setup.connect", input: z.object({ code: z.string().min(8), run: z.string().default("") }), output: Result });
+// jevKey: the owner's TypeSafe key, or empty for the version without Jev; it is never logged or kept in a record.
+export const connectRpc = defineRpc({ name: "setup.connect", input: z.object({ code: z.string().min(8), jevKey: z.string().default(""), run: z.string().default("") }), output: Result });
 export const installRpc = defineRpc({
   name: "setup.install",
   input: z.object({ userName: z.string().min(1), citizens: z.array(z.string()), accounts: z.record(z.string(), z.string()),
