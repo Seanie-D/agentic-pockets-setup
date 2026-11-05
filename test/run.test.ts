@@ -693,6 +693,15 @@ test("Jev gives no answer: the owner is told it was not answered, not that the k
   }
 });
 
+// Jev answers 402 when the TypeSafe account's credits run out (seen in Sean's house, 2026-10): the key is right, so say so.
+test("Jev says the account has no credits: the owner is told to top it up, not that the key is wrong", async () => {
+  const w = world({ jev: 402 });
+  const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home, jevKey: KEY }, w.deps);
+  assert.equal(r.ok, false); assert.equal(r.jev, "no-credits");
+  assert.match(r.message, /no credits/);
+  assert.ok(!w.posts.length && !fs.existsSync(jevFile(w.home)));
+});
+
 test("no key: no call to Jev, the default branch, no version in the record, no key file, exactly as today", async () => {
   const w = world();
   const r = await runSetup({ code: "INVITE-CODE-123456789", userName: "Nick", citizens: ["Verro"], accounts: { Verro: "claude" }, root: w.root, home: w.home, jevKey: "   " }, w.deps);

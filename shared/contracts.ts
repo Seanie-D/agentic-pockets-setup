@@ -9,7 +9,7 @@ const Extra = z.object({ id: z.string(), kind: z.enum(["hook", "skill", "agent",
   switchable: z.boolean(), file: z.string().optional() });
 // running: the step is still at work (shared/job.ts); the screen calls again, and the same job answers.
 // jev: the owner's TypeSafe key failed its test at Connect, and how (the Jev switch, ticket 03).
-const Result = z.object({ ok: z.boolean(), message: z.string(), steps: z.array(z.string()), running: z.boolean().optional(), jev: z.enum(["bad", "no-answer"]).optional() });
+const Result = z.object({ ok: z.boolean(), message: z.string(), steps: z.array(z.string()), running: z.boolean().optional(), jev: z.enum(["bad", "no-credits", "no-answer"]).optional() });
 const FirstDesk = z.object({ citizen: z.string(), agentId: z.string().nullable() });
 const Mode = z.enum(["on-demand", "always-on"]);
 // What the last Start sent and made, kept by the server until Finish (server/form.ts), so a rebuilt screen keeps it.

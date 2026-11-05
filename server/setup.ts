@@ -37,7 +37,7 @@ export interface Ops {
 export interface Deps { exec: Exec; fetch: typeof fetch; ops: Ops; hostname: () => string; computerId?: () => string; doorman: string; now: () => string }
 export interface SetupInput { paseoHome?: string; code: string; userName: string; extras?: Extra[]; extrasOff?: string[]; citizens: string[]; accounts: Record<string, string>; root: string; home: string; models?: Record<string, string>; cleanProfile?: boolean; welcome?: boolean; mode?: Mode; cafe?: boolean; jevKey?: string }
 // jev: a TypeSafe key that failed its test, and how (the screen then offers to go on without Jev).
-export interface SetupResult { ok: boolean; message: string; steps: string[]; firstDesk?: { citizen: string; agentId: string | null }; jev?: "bad" | "no-answer" }
+export interface SetupResult { ok: boolean; message: string; steps: string[]; firstDesk?: { citizen: string; agentId: string | null }; jev?: "bad" | "no-credits" | "no-answer" }
 
 // The first line of the first desk (ticket 004 Q11): setup is not finished, so the citizen says hello, sends the user
 // back to finish, and says they can ask it anything at any time.

@@ -8,10 +8,11 @@ import path from "node:path";
 export const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 // Jev answers in about 0.2 s; a call this slow is no answer.
 export const JEV_TEST_MS = 10_000;
-export type KeyTest = "pass" | "bad" | "no-answer";
+export type KeyTest = "pass" | "bad" | "no-credits" | "no-answer";
 
 export const JEV_SAYS: Record<Exclude<KeyTest, "pass">, string> = {
   bad: "Jev did not accept that key. Check it and paste it again, or empty the field to go on without Jev.",
+  "no-credits": "That key is right, but its TypeSafe account has no credits left. Top it up and try again, or empty the field to go on without Jev.",
   "no-answer": "Jev did not answer, so setup could not test your key. Try again, or empty the field to go on without Jev.",
 };
 
@@ -28,6 +29,7 @@ export async function testJevKey(key: string, fetch: typeof globalThis.fetch, ms
       signal: stop.signal,
     });
     if (res.ok) return "pass";
+    if (res.status === 402) return "no-credits";   // the TypeSafe account's credits ran out (seen 2026-10)
     return res.status === 401 || res.status === 403 ? "bad" : "no-answer";
   } catch { return "no-answer"; }
   finally { clearTimeout(timer); }
