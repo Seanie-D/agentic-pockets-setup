@@ -22,7 +22,7 @@ import { HouseStatus } from "./house-status";
 const NAMES: Record<string, string> = { MissMinutes: "Miss Minutes" };
 const label = (n: string) => NAMES[n] ?? n;
 // The Jev field's line (the Jev switch, ticket 03): what Jev is, and that the key is the owner's and billed to them.
-const JEV_LINE = "Jev (optional): a fast helper your citizens ask for quick yes/no picks. It needs your own TypeSafe key, and TypeSafe bills you for it. Paste your key here, or leave this empty.";
+const JEV_LINE = "Jev (optional): the spinal cord of your citizens' brains. The thinking model decides; Jev takes the quick reflexes, like yes/no picks, and brings up memories. It needs your own TypeSafe key, and TypeSafe bills you for it. Paste your key here, or leave this empty.";
 const ULTRON_LINE = "The Orchestrator, a catch-all agent that can coordinate efforts to your other Pocket Citizens or be your funnel for everything. One-size-fits-all, a more dialed-in Claude type experience that remembers who you are and what you need.";
 
 // The Life map, from the setup screen (the owner on TH5, 2026-10-15: "Agentic Pockets Setup also needs a Life Map button

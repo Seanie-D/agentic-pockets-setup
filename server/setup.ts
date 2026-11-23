@@ -88,6 +88,7 @@ export async function connect(input: Pick<SetupInput, "code" | "root" | "home" |
 
   // 1. The house's own key: made once, kept in the user's home, readable by the user alone.
   fs.mkdirSync(keys, { recursive: true, mode: 0o700 }); fs.chmodSync(keys, 0o700);
+  lockToOwner(path.join(input.home, ".agentic-pockets"));
   if (!fs.existsSync(key)) {
     const r = deps.exec("ssh-keygen", ["-t", "ed25519", "-N", "", "-C", `agentic-pockets ${deps.hostname()}`, "-f", key]);
     if (r.status !== 0) return fail(`Making the house key failed: ${r.stderr.trim().slice(0, 200)}`);
@@ -115,7 +116,7 @@ export async function connect(input: Pick<SetupInput, "code" | "root" | "home" |
     // run. Only a plain git address (ssh, https, or user@host:path) goes on to git.
     if (!PLAIN_REPO.test(body.repo)) return fail("The invite service sent a download address that is not one setup can trust, so nothing was downloaded. Ask the person who invited you.");
     steps.push("Your invite was accepted.");
-    fs.mkdirSync(input.root, { recursive: true });
+    fs.mkdirSync(input.root, { recursive: true, mode: 0o700 });
     const r = deps.exec("git", ["clone", "--depth", "50", ...(jevKey ? ["--branch", "jev"] : []), body.repo, upstream], { env: { GIT_SSH_COMMAND: ssh } });
     if (r.status !== 0) return fail(`Downloading the ${jevKey ? "Jev version of the " : ""}house failed: ${r.stderr.trim().slice(0, 200)}`);
     deps.exec("git", ["-C", upstream, "config", "core.sshCommand", ssh]);
@@ -124,7 +125,26 @@ export async function connect(input: Pick<SetupInput, "code" | "root" | "home" |
     const r = deps.exec("git", ["-C", upstream, "pull", "--ff-only"]);
     steps.push(r.status === 0 ? "Updated the house." : "Could not update the house; using the copy already here.");
   }
+  lockToOwner(input.root);
   return { ok: true, message: "Connected.", steps };
+}
+
+// The house is the owner's alone (Andrew Dempsey's fix, 2026-11-23; the owner's yes, 11:14 CST): the citizens' memory,
+// mail and chats are plain files, so the house folder, and ~/.agentic-pockets beside the house key, give other accounts on
+// the computer no access. A locked top folder guards every file made in it later. Windows keeps a user's own folders
+// private by its own rules, so it is skipped there (untested). The house plugin checks the same at each start.
+export function lockToOwner(dir: string, platform: NodeJS.Platform = process.platform): void {
+  if (platform === "win32") return;
+  try { if (fs.statSync(dir).mode & 0o077) fs.chmodSync(dir, 0o700); } catch { /* not there yet */ }
+}
+
+// Pockets/CLAUDE.md links to Commons/tenets.md (Andrew Dempsey's second fix): Claude Code then loads the tenets whole, and
+// core's boot does not print them. A real file already there is the owner's and is left alone.
+export function linkTenets(root: string): void {
+  const link = path.join(root, "Pockets", "CLAUDE.md");
+  if (!fs.existsSync(path.join(root, "Commons", "tenets.md")) || !fs.existsSync(path.dirname(link))) return;
+  try { if (!fs.lstatSync(link).isSymbolicLink()) return; fs.unlinkSync(link); } catch { /* none yet */ }
+  try { fs.symlinkSync(path.join("..", "Commons", "tenets.md"), link, "file"); } catch (e) { console.error(`setup: the tenets link was not made: ${String((e as Error).message).slice(0, 160)}`); }
 }
 
 function setTier(pocket: string, mode: Mode): boolean {
@@ -191,6 +211,7 @@ export async function install(input: SetupInput, deps: Deps): Promise<SetupResul
   for (const id of named) if (/^house:[^/\\]+$/.test(id) && fs.statSync(path.join(upstream, id.slice(6)), { throwIfNoEntry: false })?.isDirectory()) put(id.slice(6));
   for (const n of input.citizens) put(path.join("Pockets", n));
   steps.push(`Placed ${input.citizens.join(", ")} in ${input.root}.`);
+  linkTenets(input.root);
   // How the citizens run (Q11): on demand unless the user picked always on; a run that names no mode keeps the house's.
   // A pocket placed now takes it; one setup placed in an earlier run takes it only when the mode changes; a pocket the user
   // had before setup stays as it is.
