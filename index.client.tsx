@@ -13,6 +13,7 @@ import { Animated, Easing, Pressable, Text, View } from "react-native";
 import { onPoint, takePoint } from "./shared/pointer";
 import { addHelpButtons } from "./client/help-button";
 import { addSignInBridge } from "./client/sign-in-bridge";
+import { askTab } from "./shared/help-tab";
 
 // No install hook opens a screen, so this item takes the screen over when it first renders (ticket 009): once, while
 // this computer has not seen the welcome. The app's globalThis survives a plugin reload, so a reload does not reopen it.
@@ -97,6 +98,11 @@ export default function contribute(client: PluginClientContext) {
       <View style={{ gap: 6, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.accent, backgroundColor: theme.colors.surface1 }}>
         <Text style={{ color: theme.colors.foreground, fontSize: 16, fontWeight: "600" }}>{welcomeTitle}</Text>
         <Text style={{ color: theme.colors.foreground, fontSize: 15, lineHeight: 22 }}>{welcomeBody(item.data.citizen)}</Text>
+        {/* "What to ask" (the owner's card, 2026-11-23 3:02 PM CST): the first chat links to each citizen's example questions. */}
+        <Pressable accessibilityRole="link" onPress={() => { askTab("ask"); client.openScreen({ screenId: "setup" }); }}
+          style={{ alignSelf: "flex-start", marginTop: 4, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.accent }}>
+          <Text style={{ color: theme.colors.foreground, fontSize: 14, fontWeight: "600" }}>Open What to ask</Text>
+        </Pressable>
       </View>
     ) });
   // Setup must be reachable with the sidebar off (the owner, 2026-10-15): a Setup / Help button on each citizen's workspace.
