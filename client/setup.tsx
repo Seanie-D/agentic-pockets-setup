@@ -5,7 +5,7 @@ import { useRpc } from "@getpaseo/plugin/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { claudeSignInRpc, claudeStatusRpc, connectRpc, finishRpc, installRpc, installToolsRpc, firstTurnRpc, profileSignInRpc, profileStatusRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
+import { tutorialReadRpc, claudeSignInRpc, claudeStatusRpc, connectRpc, finishRpc, installRpc, installToolsRpc, firstTurnRpc, profileSignInRpc, profileStatusRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
 import { DEFAULT_MODE, type Mode } from "../shared/mode";
 import { untilDone } from "../shared/job";
 import { ModeChoice } from "./mode";
@@ -13,6 +13,8 @@ import { CAFE } from "../shared/cafe";
 import { LeftAlone, Welcome } from "./welcome";
 import { askToPoint } from "../shared/pointer";
 import { TutorialView } from "./tutorial";
+import { WhatToAskView } from "./what-to-ask";
+import { askedTab, onTabAsked } from "../shared/help-tab";
 import { PACKS, emptyPick, pickFrom, toggle, view, type Pick } from "../shared/picker";
 import { openExternal } from "./web";
 import { HELP } from "../shared/help-links";
@@ -142,7 +144,7 @@ export function SetupScreen({ theme, layout, navigation }: PluginScreenProps) {
   if (d.setupDone) return (
     <ScrollView style={s.screen}><View style={[s.body, { alignSelf: "center", width: "100%", maxWidth: 1040 }]}>
       <LifeMapLink s={s} />
-      <TutorialView s={s} theme={theme} compact={layout.compact} navigation={navigation} />
+      <HelpTabs s={s} theme={theme} compact={layout.compact} navigation={navigation} />
       <HouseStatus s={s} navigation={navigation} />
     </View></ScrollView>
   );
@@ -319,4 +321,28 @@ function FirstTurnLine({ s, citizen, agentId }: { s: { p: object; bad: object };
   </>;
   if (t.data?.state === "done") return <Text style={s.p}>{citizen} has answered in their workspace. {where}</Text>;
   return <Text style={s.p}>{citizen} is starting in their workspace. {where}</Text>;
+}
+
+// The Help screen's two tabs (the owner's card, 2026-11-23 3:02 PM CST: "draw it as a Help tab"): the tutorial (named Help
+// once it is complete) and "What to ask", shown from the first day, since a new user needs the ideas most in the first weeks.
+function HelpTabs({ s, theme, compact, navigation }: { s: any; theme: PluginScreenProps["theme"]; compact: boolean; navigation?: PluginScreenProps["navigation"] }) {
+  const readTut = useRpc(tutorialReadRpc);
+  const t = useQuery({ queryKey: ["setup.tutorial.read"], queryFn: () => readTut({}), refetchInterval: 30_000 });
+  const [tab, setTab] = useState<"tutorial" | "ask">(() => askedTab() ?? "tutorial");
+  useEffect(() => onTabAsked(setTab), []);
+  const c = theme.colors;
+  const one = (id: "tutorial" | "ask", label: string) => (
+    <Pressable key={id} accessibilityRole="tab" accessibilityState={{ selected: tab === id }} onPress={() => setTab(id)}
+      style={{ paddingVertical: 8, paddingHorizontal: 4, borderBottomWidth: 2, borderBottomColor: tab === id ? c.accent : "transparent" }}>
+      <Text style={{ fontSize: 15, fontWeight: tab === id ? "600" : "400", color: tab === id ? c.foreground : c.foregroundMuted }}>{label}</Text>
+    </Pressable>
+  );
+  return (
+    <View style={{ gap: 14 }}>
+      <View accessibilityRole="tablist" style={{ flexDirection: "row", gap: 22, borderBottomWidth: 1, borderBottomColor: c.border }}>
+        {one("tutorial", t.data?.complete ? "Help" : "Tutorial")}{one("ask", "What to ask")}
+      </View>
+      {tab === "tutorial" ? <TutorialView s={s} theme={theme} compact={compact} navigation={navigation} /> : <WhatToAskView s={s} theme={theme} navigation={navigation} />}
+    </View>
+  );
 }

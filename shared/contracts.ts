@@ -70,6 +70,12 @@ export const helpGlossaryRpc = defineRpc({ name: "setup.help.glossary", input: z
   output: z.object({ terms: z.array(z.object({ word: z.string(), meaning: z.string(), not: z.string().optional() })) }) });
 export const helpAskRpc = defineRpc({ name: "setup.help.ask", input: z.object({ kind: z.enum(["term", "page"]), id: z.string() }),
   output: z.object({ ok: z.boolean(), agentId: z.string().optional(), citizen: z.string().optional(), message: z.string() }) });
+// "What to ask": the house's citizens with their example questions, the ones it can add, and "Try it"'s chat.
+const askCitizen = z.object({ pocket: z.string(), name: z.string(), title: z.string(), asks: z.array(z.string()), face: z.string().nullable() });
+export const whatToAskRpc = defineRpc({ name: "setup.help.asks", input: z.object({}),
+  output: z.object({ inHouse: z.array(askCitizen), canAdd: z.array(askCitizen) }) });
+export const tryItRpc = defineRpc({ name: "setup.help.try", input: z.object({ pocket: z.string() }),
+  output: z.object({ ok: z.boolean(), agentId: z.string().optional(), message: z.string().optional() }) });
 
 // Item 1 of the next update: after setup, the house plugin's Citizens page asks whether the Claude sign-in the house's
 // desks use still works, and starts the browser sign-in again (client/sign-in-bridge.ts carries it across).

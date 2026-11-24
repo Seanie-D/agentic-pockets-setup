@@ -7,13 +7,14 @@ import { checkTools, installTools, listExtras } from "./server/tools";
 import { claudeSet, deps, discussDeps, exec, rewardDeps, startSignIn, useClaude } from "./server/real";
 import { profileDir, signedIn, signedInTo } from "./server/profile";
 import { ask, discuss } from "./server/discuss";
+import { tryIt, whatToAsk } from "./server/what-to-ask";
 import { connectRpc, finishRpc, installRpc, installToolsRpc, status, tutorialDiscussRpc, tutorialReadRpc, tutorialSeenRpc, tutorialGotItRpc, profileStatusRpc, profileSignInRpc, claudeStatusRpc, claudeSignInRpc, welcomeDismissRpc, welcomeReadRpc, modeSetRpc, askRpc, firstTurnRpc, helpButtonRpc } from "./shared/contracts";
 import { helpButton, type WorkspaceRecord } from "./shared/help-button";
 import { markWelcomeSeen, welcomeSeen } from "./server/welcome";
 import { gotIt, markSeen, readTutorial, realProbe, stateTicks } from "./server/tutorial";
 import { rewardPass } from "./server/reward";
 import { askHelp, readGlossary } from "./server/help";
-import { helpAskRpc, helpGlossaryRpc, signInAgainRpc, signInStateRpc, houseStatusRpc, repairRpc } from "./shared/contracts";
+import { helpAskRpc, helpGlossaryRpc, whatToAskRpc, tryItRpc, signInAgainRpc, signInStateRpc, houseStatusRpc, repairRpc } from "./shared/contracts";
 import { houseStatus, readHouseInputs } from "./server/house-status";
 import { repair } from "./server/discuss";
 import { signInTarget } from "./shared/sign-in-again";
@@ -120,6 +121,8 @@ export default function contribute(server: PluginServerContext) {
   });
   server.handle(helpGlossaryRpc, async () => ({ terms: readGlossary(ROOT) }));
   server.handle(helpAskRpc, async (subject, { paseo }) => askHelp(ROOT, subject, discussDeps(paseo)));
+  server.handle(whatToAskRpc, async () => whatToAsk(ROOT));
+  server.handle(tryItRpc, async ({ pocket }, { paseo }) => tryIt(ROOT, pocket, discussDeps(paseo)));
   server.on("agent.turn_ended", (_e, { paseo }) => reward(paseo));
   return () => {};
 }
