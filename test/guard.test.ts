@@ -1,5 +1,6 @@
 // The house is the owner's alone, and the tenets load whole (Andrew Dempsey's two fixes, 2026-11-23).
 //   node --test test/guard.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

@@ -2,6 +2,7 @@
 // involved in the tutorial"; Ultron's order of 2026-10-12 19:45Z, step 2): the lead citizen's desk gets one line naming
 // the item, and the screen opens that desk. No desk: one is opened with that line first.
 //   node --test test/discuss.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

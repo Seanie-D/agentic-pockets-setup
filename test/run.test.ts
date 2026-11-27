@@ -1,6 +1,7 @@
 // A full setup run against a fake doorman and a fake Paseo (ticket 004 Resolution steps 3–5; Sean's yes to the test,
 // 2026-10-12): it makes the house key, uses the invite, downloads the house, creates a workspace with its icon for each
 // picked citizen, and opens the first desk.
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

@@ -1,6 +1,7 @@
 // Item 4b of the next update:
 // after setup ends, the setup page shows house-check's seven lines, each with a tick or what is missing.
 //   node --test test/house-status.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { houseStatus, type StatusInput } from "../server/house-status.ts";

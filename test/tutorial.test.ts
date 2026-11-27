@@ -1,6 +1,7 @@
 // The tutorial's frame (ticket 009: Q1b, the tutorial lives in the setup plugin; Q2, each citizen writes its own ticks in its
 // own pocket and the tutorial adds them up; 100 % gives the lead citizen's drawing). Built on Ultron's brief, 2026-10-12 19:41Z.
 //   node --test test/tutorial.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

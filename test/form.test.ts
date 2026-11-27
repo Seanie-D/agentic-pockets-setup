@@ -2,6 +2,7 @@
 // page though the house was made. The screen can be rebuilt (a desk opens beside it), so the server keeps what a Start
 // sent and what it made, until Finish setup.
 //   node --test test/form.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

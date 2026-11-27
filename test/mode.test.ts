@@ -1,6 +1,7 @@
 // How the citizens run (ticket 004 Q11, the owner 2026-10-08: "On-demand is the default; always-on is a choice", with a
 // plain warning on always-on and "Ask about this" on every selection once the first citizen is up).
 //   node --test test/mode.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

@@ -1,6 +1,7 @@
 // The welcome take-over (ticket 009, asked 2026-10-12): the moment the setup plugin loads,
 // the welcome opens once; "set up later, leave my Paseo alone!" or starting setup means it never takes over again.
 //   node --test test/welcome.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

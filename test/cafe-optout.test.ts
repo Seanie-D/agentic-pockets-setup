@@ -2,6 +2,7 @@
 // every plugin that tracks a branch every six hours, setup included; the app's Plugin source box takes no commit, so
 // setup puts itself on the Cafe's own opt-out list when it adds the Cafe, keeping everything else the Cafe holds.
 //   node --test test/cafe-optout.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { withOptOut } from "../shared/cafe.ts";

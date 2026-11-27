@@ -2,6 +2,7 @@
 // a Help tab with each citizen's own example questions, "Try it" on each, and the citizens the house can add under
 // "Citizens you can add". Seams agreed with the owner, 2026-11-24 3:59 PM CST: the list reader and "Try it" finding the chat.
 //   node --test test/what-to-ask.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

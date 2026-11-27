@@ -3,6 +3,7 @@
 // Ultron desks. A long step now runs as one job: a call waits a while, then answers "still working"; a call while it
 // runs joins it; the call after it ends gets its result.
 //   node --test test/job.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { joinable, untilDone } from "../shared/job.ts";

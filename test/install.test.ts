@@ -2,6 +2,7 @@
 // dependency"). Paseo builds a Git source with no node_modules, so server code may import only Node's own modules,
 // Paseo's plugin SDK, and its own files; and Paseo refuses an RPC name that is not lowercase words joined by dots.
 //   node --test test/install.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

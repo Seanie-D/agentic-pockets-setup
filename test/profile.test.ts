@@ -1,6 +1,7 @@
 // The clean profile's sign-in (ticket 004): a new Claude folder is signed out, so the user signs in once before the house
 // is placed. `claude auth status --json` with that folder says whether they have.
 //   node --test test/profile.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";

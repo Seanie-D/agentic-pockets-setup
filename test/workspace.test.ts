@@ -1,6 +1,7 @@
 // Friday's read of the Windows seat, 2026-10-13 16:25 CDT: Paseo makes a second workspace for a folder that already has
 // one, so two install runs left two workspaces per citizen. Setup now uses the folder's own workspace when it has one.
 //   node --test test/workspace.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { workspaceFor } from "../shared/workspace.ts";

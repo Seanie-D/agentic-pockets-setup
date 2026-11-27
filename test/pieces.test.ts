@@ -1,6 +1,7 @@
 // The update system, ticket 01: a house hashes a release piece exactly as the release build does (publish/pieces.mjs
 // pins the same fixture and the same two hashes), so the compare sees only real changes.
 //   node --test test/pieces.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

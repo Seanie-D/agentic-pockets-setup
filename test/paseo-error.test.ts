@@ -1,6 +1,7 @@
 // Sean's re-walk, 2026-10-13 16:43 CDT: Beautiful Chat failed on the Mac and setup's log said only "}" — the last line
 // of Paseo's --json answer. The reason a Paseo command failed is its JSON error's message, or else its whole output.
 //   node --test test/paseo-error.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { paseoError } from "../server/paseo-error.ts";

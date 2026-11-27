@@ -4,17 +4,19 @@ import type { PluginScreenProps } from "@getpaseo/plugin/client";
 import { useRpc } from "@getpaseo/plugin/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { tutorialReadRpc, claudeSignInRpc, claudeStatusRpc, connectRpc, finishRpc, installRpc, installToolsRpc, firstTurnRpc, profileSignInRpc, profileStatusRpc, status, welcomeDismissRpc, welcomeReadRpc } from "../shared/contracts";
+import { AccessibilityInfo, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { tutorialReadRpc, claudeSignInRpc, claudeStatusRpc, connectRpc, finishRpc, installRpc, installToolsRpc, firstTurnRpc, profileSignInRpc, profileStatusRpc, status, welcomeDismissRpc, welcomeReadRpc, helpLoopRpc } from "../shared/contracts";
 import { DEFAULT_MODE, type Mode } from "../shared/mode";
 import { untilDone } from "../shared/job";
 import { ModeChoice } from "./mode";
 import { CAFE } from "../shared/cafe";
+import { BOX_HELP, BOXES, BOXES_TAB, TICKET_HELP, TICKET_LINK, TICKET_LOOP, TICKETS_TAB, type Box } from "../shared/box-help";
+import { askedBox } from "../shared/help-tab";
 import { LeftAlone, Welcome } from "./welcome";
 import { askToPoint } from "../shared/pointer";
 import { TutorialView } from "./tutorial";
 import { WhatToAskView } from "./what-to-ask";
-import { askedTab, onTabAsked } from "../shared/help-tab";
+import { askedTab, askTab, onTabAsked, type HelpTab } from "../shared/help-tab";
 import { PACKS, emptyPick, pickFrom, toggle, view, type Pick } from "../shared/picker";
 import { openExternal } from "./web";
 import { HELP } from "../shared/help-links";
@@ -328,10 +330,10 @@ function FirstTurnLine({ s, citizen, agentId }: { s: { p: object; bad: object };
 function HelpTabs({ s, theme, compact, navigation }: { s: any; theme: PluginScreenProps["theme"]; compact: boolean; navigation?: PluginScreenProps["navigation"] }) {
   const readTut = useRpc(tutorialReadRpc);
   const t = useQuery({ queryKey: ["setup.tutorial.read"], queryFn: () => readTut({}), refetchInterval: 30_000 });
-  const [tab, setTab] = useState<"tutorial" | "ask">(() => askedTab() ?? "tutorial");
+  const [tab, setTab] = useState<HelpTab>(() => askedTab() ?? "tutorial");
   useEffect(() => onTabAsked(setTab), []);
   const c = theme.colors;
-  const one = (id: "tutorial" | "ask", label: string) => (
+  const one = (id: HelpTab, label: string) => (
     <Pressable key={id} accessibilityRole="tab" accessibilityState={{ selected: tab === id }} onPress={() => setTab(id)}
       style={{ paddingVertical: 8, paddingHorizontal: 4, borderBottomWidth: 2, borderBottomColor: tab === id ? c.accent : "transparent" }}>
       <Text style={{ fontSize: 15, fontWeight: tab === id ? "600" : "400", color: tab === id ? c.foreground : c.foregroundMuted }}>{label}</Text>
@@ -339,10 +341,53 @@ function HelpTabs({ s, theme, compact, navigation }: { s: any; theme: PluginScre
   );
   return (
     <View style={{ gap: 14 }}>
-      <View accessibilityRole="tablist" style={{ flexDirection: "row", gap: 22, borderBottomWidth: 1, borderBottomColor: c.border }}>
-        {one("tutorial", t.data?.complete ? "Help" : "Tutorial")}{one("ask", "What to ask")}
+      <View accessibilityRole="tablist" style={{ flexDirection: "row", flexWrap: "wrap", columnGap: 22, borderBottomWidth: 1, borderBottomColor: c.border }}>
+        {one("tutorial", t.data?.complete ? "Help" : "Tutorial")}{one("ask", "What to ask")}{one("tickets", TICKETS_TAB)}{one("boxes", BOXES_TAB)}
       </View>
-      {tab === "tutorial" ? <TutorialView s={s} theme={theme} compact={compact} navigation={navigation} /> : <WhatToAskView s={s} theme={theme} navigation={navigation} />}
+      {tab === "tutorial" ? <TutorialView s={s} theme={theme} compact={compact} navigation={navigation} /> : tab === "ask" ? <WhatToAskView s={s} theme={theme} navigation={navigation} /> : tab === "tickets" ? <TicketsView s={s} /> : <BoxesView s={s} theme={theme} />}
+    </View>
+  );
+}
+
+// What a ticket is (Help's Tickets page, release 1.19): a page of its own, each box's topic links here. The
+// tutorial's looping explainer will sit at its top (tasks/open/2026-11-26-a-tutorial-that-shows-the-three-courts.md).
+function TicketsView({ s }: { s: any }) {
+  const read = useRpc(helpLoopRpc);
+  const [uri, setUri] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void AccessibilityInfo.isReduceMotionEnabled().catch(() => false).then((still) =>
+      read({ still }).then((r) => { if (live) setUri(r.uri); }).catch(() => undefined));
+    return () => { live = false; };
+  }, [read]);
+  return (
+    <View accessibilityLabel="What is a ticket" style={{ gap: 10 }}>
+      {uri ? <Image source={{ uri }} accessibilityLabel={TICKET_LOOP.alt} style={{ width: "100%", maxWidth: 360, aspectRatio: TICKET_LOOP.aspect, borderRadius: 10 }} resizeMode="contain" /> : null}
+      <Text style={s.p}>{TICKET_HELP.intro}</Text>
+      {BOXES.map((b) => <Text key={b} style={s.p}>{"\u2022 "}{TICKET_HELP.boxes[b]}</Text>)}
+      <Text style={s.p}>{TICKET_HELP.tail}</Text>
+    </View>
+  );
+}
+
+// The three boxes under each chat, one topic each (shared/box-help.ts); opened at the box Beautiful Pockets asked for.
+function BoxesView({ s, theme }: { s: any; theme: PluginScreenProps["theme"] }) {
+  const [on, setOn] = useState<Box | null>(() => askedBox());
+  useEffect(() => onTabAsked((t) => { if (t === "boxes") { const b = askedBox(); if (b) setOn(b); } }), []);
+  const c = theme.colors;
+  return (
+    <View style={{ gap: 10 }}>
+      <Text style={s.muted}>Under the newest reply in each chat sit three boxes. Each thing shows in one box only.</Text>
+      {BOXES.map((b) => (
+        <View key={b} accessibilityLabel={`${BOX_HELP[b].name} help`} style={[s.card, on === b ? { borderColor: c.accent, borderWidth: 2 } : null]}>
+          <Text style={[s.h2, { marginTop: 0 }]}>{BOX_HELP[b].name}</Text>
+          <Pressable accessibilityRole="link" onPress={() => askTab("tickets")} hitSlop={6}>
+            <Text style={[s.muted, { color: c.accent }]}>{TICKET_LINK}</Text>
+          </Pressable>
+          <Text style={s.p}>{BOX_HELP[b].holds}</Text>
+          <Text style={s.muted}>{BOX_HELP[b].how}</Text>
+        </View>
+      ))}
     </View>
   );
 }

@@ -1,5 +1,6 @@
 // The picker rule (ticket 004 Q5; the owner's yes to the test, 2026-10-12): ticking two or more citizens ticks Ultron and
 // greys him out; going back to one unticks him and leaves him free.
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { emptyPick, pickFrom, toggle, view } from "../shared/picker.ts";

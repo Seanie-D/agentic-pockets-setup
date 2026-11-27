@@ -2,6 +2,7 @@
 // runs each command through cmd, and Node joined the arguments without quotes: `-N ""` lost its empty password and the
 // comment "agentic-pockets <host>" split at the space. Setup now quotes each argument itself.
 //   node --test test/wincmd.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { cmdLine } from "../shared/winpath.ts";

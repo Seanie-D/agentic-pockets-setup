@@ -1,6 +1,6 @@
 // Agentic Pockets Help (ticket 009 Q1c, the owner 2026-10-12 14:44 CDT: after 100 % the setup plugin is "Agentic Pockets
 // Help", with the tutorial pages to re-read, the glossary, a /wait-what reminder, and "Ask Ultron about this").
-// The glossary is the house's own Commons/reference/glossary.md, read when the view opens, so it is always that house's words.
+// The glossary is the house's own Commons/reference/rules/glossary.md, read when the view opens, so it is always that house's words.
 import fs from "node:fs";
 import path from "node:path";
 import { reach, type DiscussDeps } from "./discuss.ts";
@@ -14,7 +14,10 @@ const plain = (s: string) => s.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*
 
 // One line per word: `- **word** — meaning. *not:* … *rule:* …`. The rule names a file for citizens, so the user does not see it.
 export function readGlossary(root: string): Term[] {
-  let text = ""; try { text = fs.readFileSync(path.join(root, "Commons", "reference", "glossary.md"), "utf8"); } catch { return []; }
+  // rules/ since the reference was grouped (release 1.19); the old place is read for a house that has not taken it yet.
+  let text = "";
+  for (const at of [["rules", "glossary.md"], ["glossary.md"]]) { try { text = fs.readFileSync(path.join(root, "Commons", "reference", ...at), "utf8"); break; } catch { /* next */ } }
+  if (!text) return [];
   const out: Term[] = [];
   for (const line of text.split(/\r?\n/)) {
     const m = line.match(/^- \*\*(.+?)\*\* — (.*)$/); if (!m) continue;
@@ -44,4 +47,13 @@ export async function askHelp(root: string, subject: Subject, deps: DiscussDeps)
   const r = await reach(root, lead, helpLine({ kind: subject.kind, name: found.name, text: found.text }), deps);
   if ("error" in r) return { ok: false, message: r.error };
   return { ok: true, agentId: r.agentId, citizen: lead, message: `${lead} has the ${found.noun} "${found.name}".` };
+}
+
+// The three-courts loop for Help's Tickets tab (job 2026-11-27-three-courts-explainer): its path is written from a
+// citizen's pocket, two folders below the house root, so the root plus that path less "../../" finds it.
+export function readLoop(root: string, rel: string): string | null {
+  const kind = rel.slice(rel.lastIndexOf(".") + 1).toLowerCase();
+  const mime = kind === "webp" ? "image/webp" : kind === "png" ? "image/png" : kind === "gif" ? "image/gif" : null;
+  if (!mime) return null;
+  try { return `data:${mime};base64,${fs.readFileSync(path.join(root, rel.replace(/^(\.\.\/)+/, ""))).toString("base64")}`; } catch { return null; }
 }

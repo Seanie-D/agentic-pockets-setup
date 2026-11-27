@@ -2,6 +2,7 @@
 // so the first desk failed with "Provider 'claude' is not available". Setup gives Paseo the full path of a good copy when
 // Paseo cannot find one itself or runs an old one (item 7a, choosePin below), and never over a command the user set.
 //   node --test test/claude-path.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { findCommand, pinNode } from "../shared/claude-path.ts";

@@ -2,6 +2,7 @@
 // registry, but the running Paseo kept the PATH it started with, so setup said "Claude is still missing". Setup now
 // reads PATH from the registry for every check and every command. And "How to get it" opens the Quickstart page.
 //   node --test test/winpath.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { registryPath, joinPath } from "../shared/winpath.ts";

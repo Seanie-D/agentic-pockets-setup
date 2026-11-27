@@ -3,6 +3,7 @@
 // the left being like 'name of user' and the other on the right being 'name of citizen that drew it'", with the sincere
 // line. No pre-made image. The citizen writes its drawing as shapes (tutorial/reward.json); the plugin shows it in its chat.
 //   node --test test/reward.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

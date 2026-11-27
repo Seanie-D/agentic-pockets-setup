@@ -1,6 +1,7 @@
 // The Setup / Help button in each citizen's workspace (the owner, 2026-10-15: setup must be reachable with the sidebar
 // off; "Lets add the Setup button"): which workspaces get it, and what it says.
 //   node --test test/help-button.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { helpButton } from "../shared/help-button.ts";

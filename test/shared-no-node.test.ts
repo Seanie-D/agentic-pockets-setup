@@ -2,6 +2,7 @@
 // house, 2026-11-04 11:45 CST, on release 1.8: shared/workspace-here.ts imported node:fs, and setup did not build).
 // Anything that reads the disk lives in server/.
 //   node --test test/shared-no-node.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

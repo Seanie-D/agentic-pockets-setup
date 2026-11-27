@@ -13,7 +13,8 @@ import { Animated, Easing, Pressable, Text, View } from "react-native";
 import { onPoint, takePoint } from "./shared/pointer";
 import { addHelpButtons } from "./client/help-button";
 import { addSignInBridge } from "./client/sign-in-bridge";
-import { askTab } from "./shared/help-tab";
+import { askBox, askTab } from "./shared/help-tab";
+import { BOXES, type Box } from "./shared/box-help";
 
 // No install hook opens a screen, so this item takes the screen over when it first renders (ticket 009): once, while
 // this computer has not seen the welcome. The app's globalThis survives a plugin reload, so a reload does not reopen it.
@@ -86,8 +87,13 @@ function SetupItem({ theme, currentScreen, openScreen, openPopover }: PluginSide
   );
 }
 
+// The bridge Beautiful Pockets' "What goes here?" calls (the "Ours" build, ticket 04): opens Help at one box's topic. A
+// plugin opens only its own screens, so the other plugin reaches this one through globalThis, as the file links do.
+export const HELP_BRIDGE = "__agenticPocketsHelp";
+
 export default function contribute(client: PluginClientContext) {
   client.addScreen({ id: "setup", title: "Agentic Pockets Setup", Component: SetupScreen });
+  (globalThis as Record<string, unknown>)[HELP_BRIDGE] = { open: (b: string) => { if (BOXES.includes(b as Box)) askBox(b as Box); else if (b === "tickets") askTab("tickets"); client.openScreen({ screenId: "setup" }); } };
   client.addSidebarHeaderItem({ id: "setup", title: "Agentic Pockets Setup", Component: SetupItem });
   // The tutorial's reward in the lead citizen's chat (ticket 009): its drawing, put there by the daemon half.
   client.addTimelineRenderer({ kind: REWARD_KIND, version: 1, schema: rewardRowSchema,

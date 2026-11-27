@@ -1,5 +1,6 @@
 // The tool check (ticket 004 Q2, Q7, Q8; the owner's yes to the test, 2026-10-12): it says what the machine has, what is too
 // old and what is missing, lists the user-wide extras, and changes nothing that was already there.
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

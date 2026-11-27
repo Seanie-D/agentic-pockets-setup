@@ -1,6 +1,7 @@
 // Item 1 of the next update: after setup, when a Claude sign-in runs
 // out, the house plugin's Citizens page says so and offers Sign in again. Setup holds the sign-in; this names which one.
 //   node --test test/sign-in-again.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { signInTarget } from "../shared/sign-in-again.ts";

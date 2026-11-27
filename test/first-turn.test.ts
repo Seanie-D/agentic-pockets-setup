@@ -1,6 +1,7 @@
 // Sean, re-walk 3, 2026-10-14 09:14 CDT: "You're good to go!" said the first citizen had said hello, when its first turn
 // had failed (OAuth). The page now says only what Paseo's record of that desk shows.
 //   node --test test/first-turn.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { firstTurn } from "../server/first-turn.ts";

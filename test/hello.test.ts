@@ -1,6 +1,7 @@
 // Friday's Mac walk, 2026-10-13: each citizen's card on "Who would you like to start with?" showed its hello page raw,
 // "#" and "**" on screen (Sean, 13:25 CDT). The card now draws the page's headings, bold, italics and lists.
 //   node --test test/hello.test.ts
+import "./scratch-tmp.mjs"; // first: this file's temp folders are removed when it ends
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { helloBlocks } from "../shared/hello.ts";
